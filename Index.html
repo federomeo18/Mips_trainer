@@ -1,0 +1,1838 @@
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MIPS Decomp Trainer — PS1 and PSP</title>
+<style>
+  :root{
+    --bg:#171A21;
+    --panel:#1E222C;
+    --panel2:#232833;
+    --line:#2F3644;
+    --ink:#E6E3DB;
+    --dim:#8E97A8;
+    --dimmer:#5D6675;
+    --teal:#4FB3A0;
+    --rose:#C75B6A;
+    --amber:#D9A441;
+    --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+    --serif:"Iowan Old Style",Georgia,"Times New Roman",serif;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    background:var(--bg);color:var(--ink);
+    font-family:var(--serif);font-size:17px;line-height:1.6;
+    -webkit-text-size-adjust:100%;
+  }
+  .wrap{max-width:720px;margin:0 auto;padding:0 16px 96px}
+
+  /* top bar */
+  header{
+    position:sticky;top:0;z-index:20;background:rgba(23,26,33,.94);
+    backdrop-filter:blur(8px);border-bottom:1px solid var(--line);
+  }
+  .bar{max-width:720px;margin:0 auto;padding:10px 16px;display:flex;align-items:center;gap:12px}
+  .brand{font-family:var(--sans);font-size:13px;letter-spacing:.02em;color:var(--dim);flex:1;min-width:0;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .brand b{color:var(--ink);font-weight:600}
+  .btn{
+    font-family:var(--sans);font-size:14px;color:var(--ink);background:var(--panel2);
+    border:1px solid var(--line);border-radius:6px;padding:8px 12px;cursor:pointer;
+  }
+  .btn:active{background:#2b3140}
+  .btn:focus-visible{outline:2px solid var(--teal);outline-offset:2px}
+  .btn.primary{background:var(--teal);border-color:var(--teal);color:#0F1418;font-weight:600}
+  .btn.ghost{background:transparent;color:var(--dim)}
+  .rail{height:2px;background:var(--line)}
+  .rail i{display:block;height:2px;background:var(--teal);transition:width .35s ease}
+
+  /* lesson */
+  .kicker{font-family:var(--sans);font-size:12px;color:var(--dimmer);margin:28px 0 6px}
+  h1{font-size:27px;line-height:1.2;margin:0 0 18px;font-weight:600;letter-spacing:-.01em}
+  p{margin:0 0 15px}
+  .body b{color:#fff;font-weight:600}
+  .body code{font-family:var(--mono);font-size:.85em;background:var(--panel2);
+    border:1px solid var(--line);border-radius:4px;padding:1px 5px;color:#CFE6DF;white-space:nowrap}
+  ul{margin:0 0 15px;padding-left:20px}
+  li{margin-bottom:6px}
+
+  /* disassembly listing */
+  .listing{
+    background:#12151B;border:1px solid var(--line);border-left:3px solid var(--teal);
+    border-radius:4px;margin:0 0 18px;overflow-x:auto;padding:12px 0;
+  }
+  .listing table{border-collapse:collapse;font-family:var(--mono);font-size:13.5px;line-height:1.75;width:100%}
+  .listing td{padding:0 12px;white-space:pre}
+  .addr{color:var(--dimmer);text-align:right;width:1%;user-select:none}
+  .mn{color:#9FD2C6;width:1%}
+  .op{color:var(--ink)}
+  .lbl{color:var(--amber)}
+  .cmt{color:var(--dimmer)}
+  .slot td{background:rgba(217,164,65,.06)}
+  .caption{font-family:var(--sans);font-size:12px;color:var(--dimmer);margin:-10px 0 20px}
+
+  /* editor */
+  .editor{margin:22px 0 0;border:1px solid var(--line);border-radius:6px;overflow:hidden;background:var(--panel)}
+  .sig{font-family:var(--mono);font-size:13.5px;padding:10px 12px 0;color:#CFE6DF;white-space:pre-wrap}
+  .pre{font-family:var(--mono);font-size:13.5px;padding:0 12px;color:var(--dimmer);white-space:pre-wrap}
+  textarea{
+    width:100%;background:transparent;border:0;resize:vertical;color:var(--ink);
+    font-family:var(--mono);font-size:14.5px;line-height:1.65;padding:6px 12px 12px 28px;min-height:76px;
+  }
+  textarea:focus{outline:0}
+  .editor:focus-within{border-color:var(--teal)}
+  .row{display:flex;gap:10px;margin:14px 0 0;flex-wrap:wrap}
+  .row .btn{flex:1;min-width:120px}
+
+  .verdict{margin:16px 0 0;padding:12px 14px;border-radius:6px;font-family:var(--sans);font-size:15px;line-height:1.5}
+  .ok{background:rgba(79,179,160,.12);border:1px solid rgba(79,179,160,.4)}
+  .no{background:rgba(199,91,106,.12);border:1px solid rgba(199,91,106,.4)}
+  .hintbox{background:rgba(217,164,65,.1);border:1px solid rgba(217,164,65,.35)}
+  .teach{margin:18px 0 0;padding:16px 0 0;border-top:1px solid var(--line)}
+  .teach h3{font-family:var(--sans);font-size:13px;color:var(--dim);margin:0 0 10px;font-weight:600}
+
+  /* C notes */
+  .cnote{
+    margin:22px 0 0;background:var(--panel);border:1px solid var(--line);
+    border-left:3px solid #7E8AA3;border-radius:4px;padding:0 14px;
+  }
+  .cnote>summary{
+    font-family:var(--sans);font-size:13px;color:var(--dim);padding:12px 0;cursor:pointer;
+    list-style:none;font-weight:600;
+  }
+  .cnote>summary::-webkit-details-marker{display:none}
+  .cnote>summary::before{content:"▸ ";color:var(--dimmer)}
+  .cnote[open]>summary::before{content:"▾ "}
+  .cnote[open]>summary{border-bottom:1px solid var(--line);margin-bottom:12px}
+  .cnote .inner{font-size:16px;padding-bottom:14px}
+  .cnote .inner p:last-child{margin-bottom:0}
+  .cnote pre{
+    font-family:var(--mono);font-size:13px;line-height:1.7;background:#12151B;color:var(--ink);
+    border:1px solid var(--line);border-radius:4px;padding:10px 12px;overflow-x:auto;margin:0 0 14px;
+  }
+  .cnote pre .c{color:var(--dimmer)}
+  .cnote pre .k{color:#9FD2C6}
+
+  /* glossary */
+  .gloss{
+    font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer;
+    border-bottom:1px dotted var(--amber);text-decoration:none;
+  }
+  .gloss:active,.gloss.on{background:rgba(217,164,65,.16)}
+  .gloss:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+  .gpanel{
+    position:fixed;left:0;right:0;bottom:0;z-index:40;background:var(--panel2);
+    border-top:1px solid var(--amber);padding:16px 18px calc(18px + env(safe-area-inset-bottom));
+    box-shadow:0 -10px 30px rgba(0,0,0,.45);transform:translateY(100%);transition:transform .2s ease;
+  }
+  .gpanel.on{transform:none}
+  .gpanel .term{font-family:var(--mono);font-size:14px;color:var(--amber);margin-bottom:6px}
+  .gpanel .def{font-size:16px;line-height:1.55;max-width:660px;margin:0 auto 0 0}
+  .gpanel .def code{font-family:var(--mono);font-size:.85em;background:var(--panel);
+    border:1px solid var(--line);border-radius:4px;padding:1px 5px;color:#CFE6DF}
+  .gpanel .x{position:absolute;top:10px;right:12px;background:none;border:0;color:var(--dim);
+    font-family:var(--sans);font-size:13px;cursor:pointer;padding:6px 8px}
+
+  /* index drawer */
+  .scrim{position:fixed;inset:0;background:rgba(10,12,16,.6);z-index:30;display:none}
+  .scrim.on{display:block}
+  .drawer{
+    position:fixed;inset:0 0 0 auto;width:min(360px,88vw);background:var(--panel);z-index:31;
+    border-left:1px solid var(--line);overflow-y:auto;transform:translateX(100%);transition:transform .25s ease;
+  }
+  .drawer.on{transform:none}
+  .drawer h2{font-family:var(--sans);font-size:14px;color:var(--dim);margin:0;padding:18px 18px 10px;font-weight:600}
+  .ch{font-family:var(--sans);font-size:11.5px;color:var(--dimmer);padding:18px 18px 6px;border-top:1px solid var(--line)}
+  .item{display:flex;gap:10px;align-items:baseline;padding:9px 18px;cursor:pointer;font-size:15px;line-height:1.35}
+  .item:active{background:var(--panel2)}
+  .item.cur{background:var(--panel2);box-shadow:inset 3px 0 0 var(--teal)}
+  .dot{width:8px;height:8px;border-radius:50%;border:1px solid var(--dimmer);flex:0 0 8px;position:relative;top:-1px}
+  .dot.done{background:var(--teal);border-color:var(--teal)}
+  .dot.seen{background:var(--amber);border-color:var(--amber)}
+  .foot{font-family:var(--sans);font-size:12px;color:var(--dimmer);padding:20px 18px 40px;line-height:1.5}
+  .foot a{color:var(--dim)}
+</style>
+
+<header>
+  <div class="bar">
+    <div class="brand" id="brand"></div>
+    <button class="btn" id="openIdx">Lessons</button>
+  </div>
+  <div class="rail"><i id="rail" style="width:0"></i></div>
+</header>
+
+<div class="wrap">
+  <div class="kicker" id="kicker"></div>
+  <h1 id="title"></h1>
+  <div class="body" id="body"></div>
+  <div id="asmZone"></div>
+  <div id="work"></div>
+  <div id="after"></div>
+  <div class="row" id="nav"></div>
+</div>
+
+<div class="gpanel" id="gpanel">
+  <button class="x" id="gclose">Close</button>
+  <div class="term" id="gterm"></div>
+  <div class="def" id="gdef"></div>
+</div>
+
+<div class="scrim" id="scrim"></div>
+<nav class="drawer" id="drawer">
+  <h2 id="tally"></h2>
+  <div id="idx"></div>
+  <div class="foot">
+    Answers are checked against known-good shapes, not a real compiler. When you want a true
+    byte-match verdict, take the same function to <a href="https://decomp.me">decomp.me</a> with the
+    PS1 / GCC 2.7.2 preset.
+    <br><br>
+    <span id="resetWrap"></span>
+  </div>
+</nav>
+
+<script>
+/* ---------- lesson data ---------- */
+const CH = [
+  "Reading the machine",
+  "Multiply and divide",
+  "Bits",
+  "Memory, types and structs",
+  "Control flow",
+  "Functions and the stack",
+  "Loops",
+  "Globals and addresses",
+  "The PSP: what changes",
+  "Working on a real game"
+];
+
+const L = [
+/* ============ chapter 0 ============ */
+{ch:0,kind:"concept",title:"What you are actually doing",
+body:`<p>Matching decompilation is a guessing game with a definite answer. You are handed the assembly
+that came out of a compiler in 1997. You write C. Your C goes through <b>the same compiler with the same
+options</b>, and if the instructions that come out are identical — same opcodes, same registers, same order —
+you have matched. The original source is gone, but its output is a fingerprint, and only a narrow set of C
+produces that exact fingerprint.</p>
+<p>For the PlayStation that means <b>GCC 2.7.2 at <code>-O2</code></b> targeting the <b>R3000A</b> CPU.
+An old, blunt compiler is good news: it does few clever things, so the mapping from C to assembly is
+tight and learnable.</p>
+<p>Three rules that hold for the rest of this trainer:</p>
+<ul>
+<li>You are never asked to invent names. Variables and functions can be called anything; only the
+instructions have to match.</li>
+<li>Instruction choice reveals C types. An unsigned byte load means the field was <code>unsigned char</code>.
+That is the main way types get recovered.</li>
+<li>If your version is one instruction off, the C is wrong — not the compiler. Change the C until the
+difference disappears.</li>
+</ul>`},
+
+{ch:0,kind:"concept",title:"Registers, and one instruction at a time",
+body:`<p>The CPU repeats one loop: read the 4-byte instruction the program counter points at, do it, move on
+4 bytes. Nothing else.</p>
+<p>Values live in <b>registers</b> — 32 slots inside the chip, each holding 32 bits, which is one
+<b>word</b>. Anything not in a register lives in RAM and has to be loaded into one first. The registers have
+numbers, but everyone uses the role names the calling convention gives them:</p>
+<ul>
+<li><code>$a0 $a1 $a2 $a3</code> — the first four arguments to a function, in order.</li>
+<li><code>$v0</code> — the return value. Whatever is here when the function ends is what the caller gets.</li>
+<li><code>$t0</code>–<code>$t9</code> — scratch. Free to use, destroyed by any call.</li>
+<li><code>$s0</code>–<code>$s7</code> — scratch that survives calls, but must be saved and restored.</li>
+<li><code>$zero</code> — always reads 0. Writes to it vanish. Free constant, used constantly.</li>
+<li><code>$ra</code> — where to jump back to when the function returns.</li>
+<li><code>$sp</code> — points at the function's scratch space in RAM.</li>
+</ul>
+<p>Two shapes you will see on every single exercise. <code>jr $ra</code> is the return: jump to the address
+in <code>$ra</code>. And the instruction printed <b>indented underneath a jump or branch</b> sits in the
+<b>delay slot</b> — the CPU has already fetched it by the time it works out where the jump goes, so
+<b>it runs no matter what</b>. Treat a jump and its delay slot as one unit. Half the time the delay slot is
+just <code>nop</code>, which means "do nothing".</p>`},
+
+{ch:0,kind:"concept",title:"A C refresher in one page",
+body:`<p>You will be writing small C functions from here on. This is the whole of the language you need for
+the trainer — if some of it is rusty rather than new, the per-lesson <b>C side</b> panels go deeper as each
+piece comes up.</p>
+<p><b>A function</b> is a return type, a name, a parameter list and a body in braces. Every statement ends
+with a semicolon.</p>
+<pre class="pre" style="padding:10px 0 14px">int add(int a, int b)
+{
+    return a + b;
+}</pre>
+<p><b>Types</b> are sizes. <code>char</code> is 1 byte, <code>short</code> is 2, <code>int</code> is 4, and
+each can be <code>unsigned</code> — unable to hold negatives, so the same bits cover twice the positive
+range. PS1 projects typedef these to <code>u8 s8 u16 s16 u32 s32</code>, which says the width and the
+signedness in two characters.</p>
+<p><b>Operators</b>: <code>+ - * /</code> and <code>%</code> for remainder; <code>&amp; | ^ ~</code> for
+bitwise and/or/xor/not; <code>&lt;&lt; &gt;&gt;</code> for shifts; <code>&lt; &gt; &lt;= &gt;= == !=</code>
+for comparisons, which produce 1 or 0. Zero is false and everything else is true, so a comparison result is
+just an ordinary number.</p>
+<p><b>Pointers</b> hold addresses. <code>int *p</code> declares one, <code>*p</code> reads or writes what it
+points at, <code>&amp;x</code> takes the address of something. <code>p[i]</code> is exactly
+<code>*(p + i)</code>, and pointer arithmetic counts in elements rather than bytes.</p>
+<p><b>Structs</b> group variables that sit consecutively in memory. Reach a field with a dot when you hold
+the struct, or an arrow when you hold a pointer to it: <code>a.hp</code> versus <code>p-&gt;hp</code>.</p>
+<p><b>Control flow</b> is <code>if</code> / <code>else</code>, the loops <code>while</code>,
+<code>do…while</code> and <code>for</code>, and <code>return</code> to leave a function at any point. The
+conditional expression <code>cond ? x : y</code> picks between two values.</p>
+<p>That is it. C is a small language; its reputation comes from what it lets you do wrong, not from how much
+there is to learn.</p>`},
+
+{ch:0,kind:"ex",title:"Hand the argument straight back",
+body:`<p>The smallest possible function. <code>move</code> copies one register into another —
+it isn't a real instruction, it's how the disassembler prints <code>addu $v0, $a0, $zero</code>,
+adding zero to a value, which just copies it.</p>
+<p>So: argument 1 arrives in <code>$a0</code>, gets copied to <code>$v0</code>, and the function returns.
+The <code>move</code> is in the return's delay slot, so it runs before control actually leaves.</p>`,
+asm:[["jr","$ra"],["move","$v0, $a0",1]],
+sig:"int f(int a)",hint:"One statement. The value in $v0 at the end is what the function gives back.",
+answers:["return a;"],
+teach:`<p>The whole trick of reading a function's ending: find what lands in <code>$v0</code> before
+<code>jr $ra</code>, and that is the returned expression. Everything before it exists only to build
+that value.</p>`},
+
+{ch:0,kind:"ex",title:"Adding a constant",
+body:`<p><code>addiu</code> is "add immediate". <b>Immediate</b> means the number is baked into the
+instruction itself rather than read from a register. The destination is written first, then the source,
+then the constant.</p>
+<p>So <code>addiu $v0, $a0, 5</code> reads: take <code>$a0</code>, add 5, put the result in
+<code>$v0</code>.</p>`,
+asm:[["addiu","$v0, $a0, 5"],["jr","$ra"],["nop","",1]],
+sig:"int f(int a)",hint:"Destination, source, constant — in that order.",
+answers:["return a+5;","return 5+a;"],
+teach:`<p>The <code>u</code> in <code>addiu</code> does not mean unsigned. It means "do not trap on
+overflow". GCC uses <code>addiu</code> essentially always and <code>addi</code> essentially never, so
+seeing it tells you nothing about the type — it's just what addition looks like.</p>`},
+
+{ch:0,kind:"ex",title:"There is no subtract-immediate",
+body:`<p>MIPS has no instruction for subtracting a constant. It doesn't need one: it adds a negative
+number instead. The 16-bit constant in the instruction is a signed value, so it can be negative.</p>
+<p>Which means a negative immediate in the listing is nearly always a subtraction in the C.</p>`,
+asm:[["addiu","$v0, $a0, -12"],["jr","$ra"],["nop","",1]],
+sig:"int f(int a)",hint:"Write it the way a person would write it, not as an addition of a negative.",
+answers:["return a-12;","return a+-12;"],
+teach:`<p>You will see this constantly at the top of functions as <code>addiu $sp, $sp, -0x20</code> —
+that is a function reserving 32 bytes of scratch space by moving the stack pointer down, since the
+stack grows toward lower addresses.</p>`},
+
+{ch:0,kind:"ex",title:"Adding two registers",
+body:`<p>When both operands are variables there is no constant to embed, so the instruction takes three
+registers: destination, source, source.</p>
+<p>Arguments arrive in order — first argument in <code>$a0</code>, second in <code>$a1</code>.</p>`,
+asm:[["addu","$v0, $a0, $a1"],["jr","$ra"],["nop","",1]],
+sig:"int f(int a, int b)",hint:"Two arguments, one operator.",
+answers:["return a+b;","return b+a;"],
+teach:`<p>Compare with the previous lesson: <code>addu</code> (register + register) versus
+<code>addiu</code> (register + constant). Same operation, different instruction, chosen purely by whether
+the second operand was known at compile time. The extra <code>i</code> is your signal that a literal
+number appeared in the source.</p>`},
+
+{ch:0,kind:"ex",title:"Subtraction, and why order matters",
+body:`<p><code>subu $v0, $a0, $a1</code> computes <code>$a0 - $a1</code>: destination, then the thing being
+subtracted <em>from</em>, then the thing subtracted. Same order as you'd read it aloud.</p>
+<p>Addition can be written either way round and matches; subtraction cannot. Get the operands backwards
+and you have written a different function.</p>`,
+asm:[["subu","$v0, $a1, $a0"],["jr","$ra"],["nop","",1]],
+sig:"int f(int a, int b)",hint:"Read the register names carefully — this one is deliberately not a - b.",
+answers:["return b-a;"],
+teach:`<p>Worth slowing down on every <code>subu</code> you meet. The mnemonic is symmetric-looking and
+the argument registers are one character apart, and swapping them is the single most common careless
+mistake in early decomp work.</p>`},
+
+{ch:0,kind:"ex",title:"Negation uses the zero register",
+body:`<p>There is no "negate" instruction either. To flip a sign, subtract the value from
+<code>$zero</code> — the register that always reads as 0.</p>`,
+asm:[["subu","$v0, $zero, $a0"],["jr","$ra"],["nop","",1]],
+sig:"int f(int a)",hint:"0 - a, written the short way.",
+answers:["return -a;","return 0-a;"],
+teach:`<p><code>$zero</code> earns its place many times over: it makes copy, negate, "set to zero",
+"compare against zero" and "discard this result" all fall out of instructions that already exist, instead of
+needing five more opcodes. When you see <code>$zero</code>, ask what ordinary operation it is standing in for.</p>`},
+
+/* ============ chapter 1 ============ */
+{ch:1,kind:"ex",title:"Multiplying by a power of two",
+body:`<p>Shifting a binary number one place left and filling a zero in at the right doubles it, exactly as sliding a
+decimal number left and filling a zero in multiplies by ten. Shift by <code>n</code> and you have multiplied
+by <b>2<sup>n</sup></b>.</p>
+<p>A real multiply costs about 12 cycles on this chip. A shift costs 1. So when the multiplier is a power
+of two, the compiler never emits a multiply. <code>sll</code> is "shift left logical".</p>`,
+asm:[["sll","$v0, $a0, 3"],["jr","$ra"],["nop","",1]],
+sig:"int f(int a)",hint:"Shift 3 means times 2×2×2. Write the multiply, not the shift.",
+answers:["return a*8;","return 8*a;"],
+teach:`<p>Shift 1 = ×2, 2 = ×4, 3 = ×8, 4 = ×16, 5 = ×32. Write <code>a * 8</code> in your C and GCC
+converts it to the shift for you — that's the normal way to match this, and writing <code>a &lt;&lt; 3</code>
+usually matches too. Prefer whichever reads like something a game programmer would have typed.</p>`},
+
+{ch:1,kind:"ex",title:"Multiplying two registers",
+body:`<p>When neither operand is a constant, you get the real multiplier. It sits outside the main pipeline
+in its own unit with two dedicated result registers called <b>HI</b> and <b>LO</b>, because a 32×32 multiply
+produces 64 bits: <code>LO</code> holds the low half, <code>HI</code> the high half.</p>
+<p><code>mult</code> starts it and has no destination operand at all. <code>mflo</code> — "move from LO" —
+fetches the answer afterwards. A plain C multiply only ever wants the low half.</p>`,
+asm:[["mult","$a0, $a1"],["mflo","$v0"],["jr","$ra"],["nop","",1]],
+sig:"int f(int a, int b)",hint:"The mult/mflo pair is one C operator.",
+answers:["return a*b;","return b*a;"],
+teach:`<p><code>mflo</code> without a preceding <code>mult</code> in view means you have cut the function
+boundary in the wrong place. And if you ever see <code>mfhi</code> used for a multiply result, the C was
+doing 64-bit work — that is a different and much rarer shape.</p>`},
+
+{ch:1,kind:"ex",title:"A constant that isn't a power of two",
+body:`<p>Even for awkward constants the compiler avoids <code>mult</code>, building the multiplier out of
+shifts and adds instead. Read it one line at a time, tracking what <code>$v0</code> holds:</p>
+<ul>
+<li><code>sll $v0, $a0, 3</code> → a × 8</li>
+<li><code>subu $v0, $v0, $a0</code> → a × 8 − a = a × 7</li>
+<li><code>sll $v0, $v0, 2</code> → a × 7 × 4</li>
+</ul>`,
+asm:[["sll","$v0, $a0, 3"],["subu","$v0, $v0, $a0"],["sll","$v0, $v0, 2"],["jr","$ra"],["nop","",1]],
+sig:"int f(int a)",hint:"Finish the arithmetic: 7 × 4.",
+answers:["return a*28;","return 28*a;"],
+teach:`<p>This shape is worth real money later. A run of shifts and adds with no obvious meaning is
+almost always computing an <b>array stride</b> — the size of one element. Work the constant out and you have
+recovered a <code>sizeof</code> for free: here, some structure in the game is 28 bytes wide.</p>`},
+
+{ch:1,kind:"ex",title:"An unsigned divide is one shift",
+body:`<p>Shifting right divides, dropping whatever falls off the bottom. <code>srl</code> is the
+<b>logical</b> shift right: it always feeds zeros in at the top.</p>
+<p>That is only correct for values that can never be negative, because a negative number has its top bit
+set and feeding in zeros would destroy it. So the instruction tells you the type.</p>`,
+asm:[["srl","$v0, $a0, 2"],["jr","$ra"],["nop","",1]],
+sig:"unsigned int f(unsigned int a)",hint:"Shift right 2 is divide by 4.",
+answers:["return a/4;","return a>>2;"],
+teach:`<p>The signature was handed to you here, but in real work you derive it the other way: you see
+<code>srl</code>, and that is your evidence the value was unsigned. Instruction choice is how types get
+recovered — there is no other record of them.</p>`},
+
+{ch:1,kind:"ex",title:"A signed divide is not one shift",
+body:`<p>C requires division to round toward zero: <code>-7 / 4</code> must be <code>-1</code>. An arithmetic
+shift right rounds toward negative infinity instead, giving <code>-2</code>. So for signed values the
+compiler patches the number up first.</p>
+<p>Reading it: if the value is zero or positive, branch straight to the shift with the value unchanged.
+Otherwise add 3 first — that bias is what makes the rounding come out right. <code>sra</code> is the
+<b>arithmetic</b> shift right, which preserves the sign bit.</p>`,
+asm:[["bgez","$a0, .L_sh"],["move","$v0, $a0",1],["addiu","$v0, $a0, 3"],["LABEL",".L_sh:"],
+     ["sra","$v0, $v0, 2"],["jr","$ra"],["nop","",1]],
+sig:"int f(int a)",hint:"Five instructions, one C operator. The bias is invisible in the source.",
+answers:["return a/4;"],
+teach:`<p>Learn this as a single unit: <b>branch on sign, add (divisor − 1), arithmetic shift</b> is signed
+division by a power of two, every time. The bias is always one less than the divisor, so a bias of 7 means
+÷8. None of it appears in the C.</p>`},
+
+{ch:1,kind:"ex",title:"Real division, and the trap",
+body:`<p>When the divisor is a variable there is no shortcut — <code>div</code> runs, putting the quotient
+in <code>LO</code> and the remainder in <code>HI</code> at the same time. The <code>$zero</code> written as
+its first operand is a syntax quirk and means nothing.</p>
+<p>The hardware does not fault on divide-by-zero, it produces garbage, so GCC bolts on its own check:
+skip past the trap if the divisor is nonzero, otherwise hit <code>break 0x7</code>, which is breakpoint
+code 7, "divide by zero".</p>`,
+asm:[["div","$zero, $a0, $a1"],["bnez","$a1, .L_ok"],["nop","",1],["break","0x7"],["LABEL",".L_ok:"],
+     ["mflo","$v0"],["jr","$ra"],["nop","",1]],
+sig:"int f(int a, int b)",hint:"All six instructions collapse into one operator.",
+answers:["return a/b;"],
+teach:`<p><code>break 0x7</code> in a listing is essentially never anything but this. Recognise the whole
+blob on sight and read straight past it — the C author wrote a slash and nothing else.</p>`},
+
+{ch:1,kind:"ex",title:"Modulo comes free with the divide",
+body:`<p>One <code>div</code> produces both results, so <code>%</code> costs exactly what <code>/</code>
+costs. The only difference in the listing is which register gets read at the end.</p>`,
+asm:[["div","$zero, $a0, $a1"],["bnez","$a1, .L_ok"],["nop","",1],["break","0x7"],["LABEL",".L_ok:"],
+     ["mfhi","$v0"],["jr","$ra"],["nop","",1]],
+sig:"int f(int a, int b)",hint:"HI holds the remainder.",
+answers:["return a%b;"],
+teach:`<p><code>mflo</code> → quotient → <code>/</code>. <code>mfhi</code> → remainder → <code>%</code>.
+If a function needs both, you will see one <code>div</code> followed by both moves, and the C used
+<code>/</code> and <code>%</code> on the same pair of operands.</p>`},
+
+/* ============ chapter 2 ============ */
+{ch:2,kind:"ex",title:"Keeping only some bits",
+body:`<p><code>and</code> compares two values bit by bit and keeps a bit only where both sides have it.
+Against a constant like <code>0xFF</code> — eight bits set — everything above the low byte is wiped out.
+That is a <b>mask</b>.</p>
+<p><code>andi</code> is the immediate form, and its constant is <b>zero</b>-extended rather than
+sign-extended, which is the one place where <code>andi</code>, <code>ori</code> and <code>xori</code> differ
+from the arithmetic immediates.</p>`,
+asm:[["andi","$v0, $a0, 0xff"],["jr","$ra"],["nop","",1]],
+sig:"int f(int a)",hint:"Use the hex constant as written.",
+answers:["return a&0xff;","return a&255;","return a&0xFF;"],
+teach:`<p>A mask of <code>0xFF</code> is often a hint that a byte-sized value is being extracted from a
+packed word, and a mask that is one less than a power of two (<code>0xF</code>, <code>0x3F</code>,
+<code>0xFF</code>) is sometimes an unsigned modulo: <code>x % 64</code> compiles to
+<code>andi $v0, $a0, 0x3f</code>.</p>`},
+
+{ch:2,kind:"ex",title:"Turning a bit on",
+body:`<p><code>or</code> keeps a bit if <b>either</b> side has it, so OR-ing against a constant with one bit
+set turns that bit on and leaves everything else alone. That is how flags get set.</p>`,
+asm:[["ori","$v0, $a0, 0x10"],["jr","$ra"],["nop","",1]],
+sig:"int f(int a)",hint:"Set the bit, don't touch the rest.",
+answers:["return a|0x10;","return a|16;"],
+teach:`<p>The matching pair: to turn a flag <b>off</b> you AND against its inverse, which shows up as
+<code>andi $v0, $a0, 0xffef</code> — a constant with exactly one zero bit in it. A mask that is almost all
+ones is a bit being cleared.</p>`},
+
+{ch:2,kind:"ex",title:"Flipping bits",
+body:`<p><code>xor</code> keeps a bit where exactly one side has it. XOR against a mask flips precisely
+those bits and leaves the others untouched, which makes it the standard way to toggle a flag.</p>`,
+asm:[["xori","$v0, $a0, 0x1"],["jr","$ra"],["nop","",1]],
+sig:"int f(int a)",hint:"One character operator.",
+answers:["return a^1;","return a^0x1;"],
+teach:`<p>A special case worth memorising: XOR against <code>-1</code> flips every bit, which is C's
+<code>~x</code>. GCC emits that as <code>nor $v0, $a0, $zero</code> rather than an <code>xori</code>, since
+the immediate form can't reach a 32-bit constant.</p>`},
+
+{ch:2,kind:"ex",title:"Reading a flag",
+body:`<p>Nothing new in the instructions — but notice what the function returns. It masks one bit and hands
+back the masked value, not a 0/1 answer. In C that is enough for an <code>if</code>, and the compiler
+did not need to normalise it.</p>`,
+asm:[["andi","$v0, $a0, 0x4"],["jr","$ra"],["nop","",1]],
+sig:"int f(int flags)",hint:"The parameter is called flags.",
+answers:["return flags&4;","return flags&0x4;"],
+teach:`<p>If the C had been <code>return (flags & 4) != 0;</code> you would see an extra instruction —
+<code>sltu</code> — squashing the result to exactly 0 or 1. The presence or absence of that normalising step
+tells you whether the source wrote a bare mask or an explicit comparison.</p>`},
+
+{ch:2,kind:"ex",title:"Packing two values into one word",
+body:`<p>Shift one value up out of the way, then OR the other into the space below it. Here the first
+argument ends up in the high 16 bits and the second occupies the low 16.</p>`,
+asm:[["sll","$v0, $a0, 16"],["or","$v0, $v0, $a1"],["jr","$ra"],["nop","",1]],
+sig:"int f(int hi, int lo)",hint:"Two operators, one statement.",
+answers:["return (hi<<16)|lo;","return hi<<16|lo;","return lo|(hi<<16);"],
+teach:`<p>PS1 code packs values like this everywhere, because memory was tight: colours as three bytes in
+one word, tile IDs with flags in the spare bits, coordinates as two 16-bit halves. When you see a shift
+feeding an OR, you are looking at a packed field, and the shift amount tells you where the boundary is.</p>`},
+
+/* ============ chapter 3 ============ */
+{ch:3,kind:"ex",title:"Following a pointer",
+body:`<p>Arithmetic instructions cannot touch memory on this machine. Only loads and stores can, and all
+they do is move a value between RAM and a register.</p>
+<p><code>lw $v0, 0($a0)</code> — "load word" — reads: take the address in <code>$a0</code>, add the offset
+0, fetch the 32 bits living at that address, put them in <code>$v0</code>. A pointer is nothing more than an
+address sitting in a register.</p>`,
+asm:[["lw","$v0, 0($a0)"],["jr","$ra"],["nop","",1]],
+sig:"int f(int *p)",hint:"One star.",
+answers:["return *p;","return p[0];"],
+teach:`<p>The distinction to keep straight: <code>lw $v0, 0($a0)</code> returns the <b>contents</b>, while
+<code>move $v0, $a0</code> would return the <b>address itself</b>. Load means follow the pointer. Every
+<code>l</code> instruction in a listing is a dereference in the C.</p>`},
+
+{ch:3,kind:"ex",title:"The load instruction is the type declaration",
+body:`<p>There are separate loads for each width, and for bytes and halfwords, separate signed and unsigned
+versions. <code>lbu</code> is "load byte unsigned": fetch one byte and fill the upper 24 bits of the
+register with zeros.</p>
+<p>The compiler picks between <code>lb</code> and <code>lbu</code> purely from the declared type of what is
+being read.</p>`,
+asm:[["lbu","$v0, 0($a0)"],["jr","$ra"],["nop","",1]],
+sig:"int f(unsigned char *p)",hint:"Same shape as the previous lesson.",
+answers:["return *p;","return p[0];"],
+teach:`<p>The full set: <code>lb</code>/<code>lbu</code> for 1 byte, <code>lh</code>/<code>lhu</code> for 2,
+and <code>lw</code> for 4 — words have no signed/unsigned split because there is nothing wider to extend
+into. Five load instructions, five C types, and the mapping is exact.</p>`},
+
+{ch:3,kind:"ex",title:"A signed byte fills with ones",
+body:`<p><code>lb</code> sign-extends: it copies the byte's top bit through the upper 24 bits. A byte
+holding <code>0xF3</code> becomes <code>0xFFFFFFF3</code>, which is −13, instead of the 243 you would get
+from <code>lbu</code>.</p>
+<p>Same memory, same address, completely different number. Picking the wrong one is a bug the original
+compiler would never have written.</p>`,
+asm:[["lb","$v0, 0($a0)"],["jr","$ra"],["nop","",1]],
+sig:"int f(signed char *p)",hint:"Identical C to the last one — the type in the signature does the work.",
+answers:["return *p;","return p[0];"],
+teach:`<p>A subtlety for later: plain <code>char</code> on this toolchain is signed, so <code>char *</code>
+also produces <code>lb</code>. PS1 decomp projects lean on explicit <code>u8</code> and <code>s8</code>
+typedefs precisely to make the choice visible in the source instead of depending on a compiler default.</p>`},
+
+{ch:3,kind:"ex",title:"Writing through a pointer",
+body:`<p>Stores mirror loads. <code>sw $a1, 0($a0)</code> writes the 32 bits in <code>$a1</code> to the
+address in <code>$a0</code>. Note the operand order does not flip: the register comes first in the text even
+though the data flows the other way.</p>
+<p>This function returns nothing, so <code>$v0</code> is never touched.</p>`,
+asm:[["sw","$a1, 0($a0)"],["jr","$ra"],["nop","",1]],
+sig:"void f(int *p, int x)",hint:"One assignment, no return.",
+answers:["*p=x;","p[0]=x;"],
+teach:`<p>Which register is the address and which is the data is decided entirely by the syntax: whatever
+sits inside the parentheses is the address. The argument order in the C signature is a separate question —
+here it happened to line up, but it often doesn't.</p>`},
+
+{ch:3,kind:"ex",title:"A constant index is folded into the offset",
+body:`<p>The offset built into a load or store is free — it costs no extra instruction. So a constant index
+never produces any arithmetic; the compiler just multiplies it by the element size at compile time and puts
+the result in the offset field.</p>
+<p>Here the element is a 4-byte <code>int</code> and the offset is 16, so the index was 4.</p>`,
+asm:[["lw","$v0, 0x10($a0)"],["jr","$ra"],["nop","",1]],
+sig:"int f(int *p)",hint:"16 ÷ 4.",
+answers:["return p[4];","return *(p+4);"],
+teach:`<p>Divide the offset by the element size to recover the index. With a byte array the offset
+<em>is</em> the index; with halfwords, halve it. Get the element size wrong and every index in the function
+comes out wrong by the same factor, which is a satisfying bug to find.</p>`},
+
+{ch:3,kind:"ex",title:"A variable index has to be scaled",
+body:`<p>When the index is a variable the scaling cannot happen at compile time, so it appears as real
+instructions: shift the index up by the element size, add it to the base, then load from the computed
+address with offset 0.</p>
+<p>Shift 2 means ×4, so this array's elements are 4 bytes.</p>`,
+asm:[["sll","$v0, $a1, 2"],["addu","$v0, $a0, $v0"],["lw","$v0, 0($v0)"],["jr","$ra"],["nop","",1]],
+sig:"int f(int *p, int i)",hint:"Three instructions, one indexing expression.",
+answers:["return p[i];","return *(p+i);"],
+teach:`<p><b>shift, add, load</b> is the universal array-indexing fingerprint, and the shift amount hands you
+the element size: 0 for bytes, 1 for halfwords, 2 for words. If instead of a shift you find the
+multiply-by-constant shape from chapter 2, you are indexing an <b>array of structs</b> and that constant is
+the struct's size.</p>`},
+
+{ch:3,kind:"ex",title:"Struct fields are just offsets",
+body:`<p>A struct is variables laid out consecutively in memory, so reaching a field is reaching a fixed
+distance past the start. There is nothing else to it — the name is gone, only the number survives.</p>
+<p>Given this layout, which field sits at offset 0x0C?</p>
+<pre class="pre" style="padding:10px 0 4px">typedef struct {
+    int x;      /* 0x00 */
+    int y;      /* 0x04 */
+    int z;      /* 0x08 */
+    int hp;     /* 0x0C */
+    int flags;  /* 0x10 */
+} Actor;</pre>`,
+asm:[["lw","$v0, 0xc($a0)"],["jr","$ra"],["nop","",1]],
+sig:"int f(Actor *act)",hint:"Use the arrow operator on act.",
+answers:["return act->hp;","return (*act).hp;"],
+teach:`<p>In real work you have no layout to consult — you build it. Every <code>lw $v0, 0x24($s0)</code>
+scattered through a game is evidence of a 4-byte field at offset 0x24, and the load width tells you its
+type. Collect enough of these and the struct reassembles itself.</p>`},
+
+{ch:3,kind:"ex",title:"Narrow fields, and the holes between them",
+body:`<p>Byte and halfword fields load with the narrow instructions, and the type comes with them —
+<code>lhu</code> here means the field is an unsigned 16-bit value.</p>
+<p>Note the offset. <code>state</code> is one byte at 0x00, yet <code>timer</code> starts at 0x02, not
+0x01: a halfword must sit at an even address, so the compiler left a byte of padding behind. Struct layouts
+have holes, and forgetting them is why reconstructed offsets come out one or two off.</p>
+<pre class="pre" style="padding:10px 0 4px">typedef struct {
+    unsigned char  state;  /* 0x00 */
+    /* 1 byte padding    */
+    unsigned short timer;  /* 0x02 */
+    int            score;  /* 0x04 */
+} Entry;</pre>`,
+asm:[["lhu","$v0, 0x2($a0)"],["jr","$ra"],["nop","",1]],
+sig:"int f(Entry *e)",hint:"Offset 0x02, loaded as an unsigned halfword.",
+answers:["return e->timer;","return (*e).timer;"],
+teach:`<p>The rule causing the hole: every field must sit at an address divisible by its own size, because
+the hardware refuses unaligned access outright — a misaligned <code>lw</code> raises an exception rather than
+being fixed up. So the compiler inserts padding, and the struct's total size gets rounded up too.</p>`},
+
+/* ============ chapter 4 ============ */
+{ch:4,kind:"ex",title:"Comparison is a value, not a flag",
+body:`<p>Many processors keep hidden status bits that a compare sets and a branch later reads. MIPS has
+nothing like that. A comparison is an ordinary instruction writing an ordinary register:
+<code>slt</code>, "set on less than", writes 1 if the first source is less than the second, otherwise 0.</p>
+<p>Which means a function returning a comparison needs no branch at all.</p>`,
+asm:[["slt","$v0, $a0, $a1"],["jr","$ra"],["nop","",1]],
+sig:"int f(int a, int b)",hint:"The comparison itself is the returned value.",
+answers:["return a<b;"],
+teach:`<p><code>slt</code> is the <b>signed</b> comparison. Its twin <code>sltu</code> is unsigned, and the
+compiler picks between them from the operand types — so which one appears is more evidence for type
+recovery, exactly like the load widths.</p>`},
+
+{ch:4,kind:"ex",title:"Comparing against a constant",
+body:`<p>Same instruction with an immediate operand, following the pattern you have seen all the way
+through: an <code>i</code> suffix means the second operand was a literal in the source.</p>`,
+asm:[["slti","$v0, $a0, 0xa"],["jr","$ra"],["nop","",1]],
+sig:"int f(int a)",hint:"0xa is 10 in decimal. Write whichever a game programmer would have.",
+answers:["return a<10;","return a<0xa;"],
+teach:`<p>There is no "set on greater than" instruction, so <code>a &gt; 10</code> compiles as
+<code>slti $v0, $a0, 11</code> — the compiler rewrites it into a less-than against the next constant up.
+An off-by-one constant in a comparison usually means the source used the opposite operator.</p>`},
+
+{ch:4,kind:"ex",title:"The early return",
+body:`<p>Now a branch. <code>beqz $a0, .L_ret</code> jumps to the label if <code>$a0</code> is zero. The
+indented <code>move</code> is in its delay slot, so the return value is zeroed on <b>both</b> paths, taken or
+not — and then the <code>lw</code> overwrites it when the branch was not taken.</p>
+<p>Read it as: if the pointer is null, hand back 0 without touching memory. Otherwise dereference it.</p>`,
+asm:[["beqz","$a0, .L_ret"],["move","$v0, $zero",1],["lw","$v0, 0($a0)"],["LABEL",".L_ret:"],
+     ["jr","$ra"],["nop","",1]],
+sig:"int f(int *p)",hint:"Two statements: a guard, then the normal case.",
+answers:["if(p==0)return 0;return*p;","if(!p)return 0;return*p;","if(p==NULL)return 0;return*p;",
+         "return p?*p:0;","return p!=0?*p:0;","if(p)return*p;return 0;"],
+teach:`<p>Null checks are the most common branch in game code, and this is what one looks like. The delay
+slot doing useful work on both paths — rather than holding a <code>nop</code> — is the compiler's scheduler
+squeezing out a free instruction, and you should expect it rather than read it as significant.</p>`},
+
+{ch:4,kind:"ex",title:"Picking the larger of two",
+body:`<p>Everything you have collected, in one function. The comparison produces a value, the branch tests
+that value, and the delay slot preloads one of the two candidates so that only the other needs a separate
+instruction.</p>
+<p>Trace it: if <code>a &lt; b</code> is false, jump to the end with <code>a</code> already in
+<code>$v0</code>. If it is true, fall through and overwrite with <code>b</code>.</p>`,
+asm:[["slt","$v0, $a0, $a1"],["beqz","$v0, .L_end"],["move","$v0, $a0",1],["move","$v0, $a1"],
+     ["LABEL",".L_end:"],["jr","$ra"],["nop","",1]],
+sig:"int f(int a, int b)",hint:"A ternary, or an if — both are worth trying.",
+answers:["return a<b?b:a;","return(a<b)?b:a;","return a>b?a:b;","return(a>b)?a:b;",
+         "if(a<b)return b;return a;","if(a>b)return a;return b;"],
+teach:`<p>Note the inversion, which is the habit to build: <code>slt</code> sets 1 when the comparison is
+<b>true</b>, but <code>beqz</code> jumps when it is <b>false</b>. The branch exists to skip <em>past</em> the
+code the C wanted to run, so the assembly always tests the opposite of what the source says. Flip it back
+every time you read one.</p>`},
+
+{ch:4,kind:"concept",title:"Writing C the compiler recognises",
+body:`<p>Matching work inverts the usual advice about writing good code, so it is worth being explicit about
+which habits help here and which ones are for the rest of your life.</p>
+<p><b>Do not hand-optimise.</b> Write <code>a * 8</code>, not <code>a &lt;&lt; 3</code>. Write
+<code>a / 4</code>, not a shift with a bias you worked out yourself. GCC already performs those rewrites,
+and doing them in the source usually produces the same instructions by a longer route — or subtly different
+ones for signed values. Say what you mean and let the compiler do its job.</p>
+<p><b>Local variables are free.</b> Splitting an expression across three named locals produces identical
+code to cramming it into one line, because the compiler keeps values in registers and never allocates a
+variable that does not need memory. Name intermediate steps whenever it makes the function readable —
+it costs nothing.</p>
+<p><b>Types are not decoration.</b> Signedness and width change which instructions come out, so they are
+load-bearing in a way they are not in higher-level languages. Reading the assembly tells you what the type
+must have been; getting it wrong shows up immediately as a failed match rather than as a bug three months
+later.</p>
+<p><b>Match the shape, not just the result.</b> An <code>if</code> with an early return and the equivalent
+<code>if</code>/<code>else</code> can compile to different branch layouts. When your version is close but
+the branches are arranged differently, restructure the C rather than adding cleverness to it.</p>
+<p><b>Write what a 1997 game programmer would have written.</b> No modern idioms, no defensive checks that
+are not in the assembly, no helper functions that do not exist in the binary. Every instruction in the
+target came from something in the original source, and nothing in the original source vanished without
+trace.</p>
+<p>The habits that transfer to ordinary C work: brace every <code>if</code>, parenthesise anything mixing
+bitwise operators with comparisons, prefer the narrowest correct type, check a pointer before dereferencing
+it, and never index an array with a value you have not bounded. C will let you do all of those wrong and
+will not warn you.</p>`},
+
+/* ============ chapter 5 — functions and the stack ============ */
+{ch:5,kind:"concept",title:"What a call actually costs",
+body:`<p>Calling is one instruction: <code>jal</code>, "jump and link", which writes the address of the
+instruction after itself into <code>$ra</code> and jumps. Returning is <code>jr $ra</code>. That is the whole
+mechanism — there is no call stack in hardware, just one register holding one return address.</p>
+<p>Which creates the problem every prologue exists to solve. If this function calls something else, that
+<code>jal</code> overwrites <code>$ra</code> and the way home is gone. So any function that makes a call
+must save <code>$ra</code> in memory first and reload it before returning.</p>
+<p>Memory for that comes from the <b>stack</b>: subtract from <code>$sp</code> to claim bytes, store into
+them, reload, then add the same amount back. There is no push or pop instruction.</p>
+<p>The same applies to the <code>$s</code> registers. They are the ones guaranteed to survive a call, which
+means a function using them owes that guarantee to <em>its</em> caller and must save and restore any it
+touches. So the prologue tells you a lot before you have read the body:</p>
+<ul>
+<li>No prologue at all → this function calls nothing. A <b>leaf</b>.</li>
+<li><code>$ra</code> saved → it makes at least one call.</li>
+<li>Each <code>$s</code> register saved → one more value that had to stay alive across a call.</li>
+</ul>`},
+
+{ch:5,kind:"ex",title:"A leaf function has no frame",
+body:`<p>This function calls nothing, so it never touches <code>$sp</code> and never saves anything. Every
+value it needs lives in a temporary register for the few instructions it exists.</p>
+<p>Three instructions total, and the last real one is in the return's delay slot.</p>`,
+asm:[["sll","$v0, $a0, 1"],["jr","$ra"],["addu","$v0, $v0, $a1",1]],
+sig:"int f(int a, int b)",hint:"Shift 1 is times 2.",
+answers:["return a*2+b;","return b+a*2;","return (a*2)+b;"],
+teach:`<p>Leaf functions are where to start on a real project: no frame, no calls, usually short, and a
+failed match has nowhere to hide. Find the ones with no <code>addiu $sp</code> at the top and work through
+them before touching anything bigger.</p>`},
+
+{ch:5,kind:"ex",title:"Passing a call's result straight back",
+body:`<p>Now a frame. Claim 24 bytes, park <code>$ra</code> near the top of it, call, reload
+<code>$ra</code>, return, and release the frame in the delay slot.</p>
+<p>Nothing touches <code>$v0</code> after the call — whatever <code>helper</code> returned is still sitting
+there and becomes this function's answer too.</p>
+<pre class="pre" style="padding:10px 0 4px">int helper(void);</pre>`,
+asm:[["addiu","$sp, $sp, -0x18"],["sw","$ra, 0x14($sp)"],["jal","helper"],["nop","",1],
+     ["lw","$ra, 0x14($sp)"],["jr","$ra"],["addiu","$sp, $sp, 0x18",1]],
+sig:"int f(void)",hint:"One statement. The frame and the saves are not written in C at all.",
+answers:["return helper();"],
+teach:`<p>Six of the seven instructions are bookkeeping the compiler generates from nothing you write. The C
+author wrote one line. Learn to skim past a prologue and epilogue the way you skim past punctuation.</p>`},
+
+{ch:5,kind:"ex",title:"Arguments go in, result comes out",
+body:`<p>The delay slot is doing real work here: <code>move $a0, $a1</code> puts the second argument into
+the first argument slot, and it runs before control transfers, so <code>helper</code> sees it.</p>
+<p>Then the result comes back in <code>$v0</code> and gets one added to it.</p>
+<pre class="pre" style="padding:10px 0 4px">int helper(int x);</pre>`,
+asm:[["addiu","$sp, $sp, -0x18"],["sw","$ra, 0x14($sp)"],["jal","helper"],["move","$a0, $a1",1],
+     ["addiu","$v0, $v0, 1"],["lw","$ra, 0x14($sp)"],["jr","$ra"],["addiu","$sp, $sp, 0x18",1]],
+sig:"int f(int a, int b)",hint:"Which argument reaches helper — a or b?",
+answers:["return helper(b)+1;","return 1+helper(b);"],
+teach:`<p>To read any call, look at what is in <code>$a0</code>–<code>$a3</code> at the moment the
+<code>jal</code> fires, <b>including the delay slot instruction</b>. Missing that the delay slot loads an
+argument is how people end up decompiling <code>helper(a)</code> when the code says <code>helper(b)</code>.</p>`},
+
+{ch:5,kind:"ex",title:"Keeping a value alive across a call",
+body:`<p><code>$s0</code> appears, so the prologue has to save it — that is the extra <code>sw</code> and
+the matching <code>lw</code>, and it is why the frame grew to 32 bytes.</p>
+<p>Why <code>$s0</code> rather than a temporary? Because <code>b</code> is still needed <em>after</em> the
+call, and a <code>$t</code> register would have been destroyed by it. Note <code>$a0</code> is left alone,
+so <code>helper</code> receives the first argument unchanged.</p>
+<pre class="pre" style="padding:10px 0 4px">int helper(int x);</pre>`,
+asm:[["addiu","$sp, $sp, -0x20"],["sw","$ra, 0x1c($sp)"],["sw","$s0, 0x18($sp)"],["move","$s0, $a1"],
+     ["jal","helper"],["nop","",1],["addu","$v0, $v0, $s0"],["lw","$ra, 0x1c($sp)"],
+     ["lw","$s0, 0x18($sp)"],["jr","$ra"],["addiu","$sp, $sp, 0x20",1]],
+sig:"int f(int a, int b)",hint:"The saved register is just b, parked somewhere safe.",
+answers:["return helper(a)+b;","return b+helper(a);"],
+teach:`<p>Count the saved <code>$s</code> registers and you know how many values the original C kept live
+across calls. It is a reliable structural hint: two saves means two variables spanning the call, which
+constrains the shape of the function before you have decoded a single line of the body.</p>`},
+
+{ch:5,kind:"ex",title:"Swapping arguments on the way in",
+body:`<p><code>$v0</code> is used as a scratch holding pen: stash <code>a</code>, move <code>b</code> into
+the first slot, then drop <code>a</code> into the second slot from the delay slot. Classic register shuffle,
+and it exists because you cannot move two registers at once.</p>
+<pre class="pre" style="padding:10px 0 4px">int helper2(int x, int y);</pre>`,
+asm:[["addiu","$sp, $sp, -0x18"],["sw","$ra, 0x14($sp)"],["move","$v0, $a0"],["move","$a0, $a1"],
+     ["jal","helper2"],["move","$a1, $v0",1],["lw","$ra, 0x14($sp)"],["jr","$ra"],
+     ["addiu","$sp, $sp, 0x18",1]],
+sig:"int f(int a, int b)",hint:"Track what ends up in $a0 and $a1 when the jal fires.",
+answers:["return helper2(b,a);"],
+teach:`<p>Shuffles like this carry no meaning of their own — they are the register allocator solving a
+puzzle. Read only the final contents of the argument registers and ignore the route they took to get
+there.</p>`},
+
+{ch:5,kind:"ex",title:"A function that returns nothing",
+body:`<p>Two calls in sequence. <code>$v0</code> is never set up and never read, because the C returns
+<code>void</code>.</p>
+<pre class="pre" style="padding:10px 0 4px">void init(void);
+void reset(void);</pre>`,
+asm:[["addiu","$sp, $sp, -0x18"],["sw","$ra, 0x14($sp)"],["jal","init"],["nop","",1],
+     ["jal","reset"],["nop","",1],["lw","$ra, 0x14($sp)"],["jr","$ra"],["addiu","$sp, $sp, 0x18",1]],
+sig:"void f(void)",hint:"Two statements, in the order they appear.",
+answers:["init();reset();"],
+teach:`<p>Call order in the assembly is call order in the C — the compiler will reorder arithmetic freely
+but never two calls, since it cannot know what they touch. Sequences of <code>jal</code>s translate
+one-for-one, which makes big glue functions surprisingly easy wins.</p>`},
+
+/* ============ chapter 6 — loops ============ */
+{ch:6,kind:"concept",title:"Every loop is the same skeleton",
+body:`<p>GCC compiles <code>for</code>, <code>while</code> and <code>do…while</code> into one shape, so the
+keyword the original programmer used is usually unrecoverable and any of them can match.</p>
+<p>The shape has four parts:</p>
+<ul>
+<li>A <b>guard</b> at the top that skips the whole loop if it should not run even once.</li>
+<li>A <b>label</b> marking the top of the body.</li>
+<li>The <b>body</b>, with the counter decrement and pointer advance mixed into it wherever they fit.</li>
+<li>A <b>back edge</b> at the bottom — a branch to the top label, usually with a useful instruction in its
+delay slot.</li>
+</ul>
+<p>So the test appears <em>twice</em> in different forms: once as the guard, once as the back edge. That is
+the compiler turning a <code>while</code> into a <code>do…while</code> plus one check, because a loop that
+tests at the bottom costs one branch per iteration instead of two.</p>
+<p>Counting down toward zero is also normal even when the C counted up, because comparing against zero is
+free while comparing against <code>n</code> needs an extra instruction. Do not read a downward count as
+meaningful.</p>`},
+
+{ch:6,kind:"ex",title:"Summing an array",loose:true,
+body:`<p>Work through it once: guard on the count, zero the accumulator in the guard's delay slot, then each
+pass loads a word, decrements the count, advances the pointer by one element, and adds into the running
+total from the back edge's delay slot.</p>
+<p><code>blez</code> is "branch if less than or equal to zero" and it is a <b>signed</b> test, which tells
+you the count parameter is an <code>int</code> rather than unsigned.</p>`,
+asm:[["blez","$a1, .L_end"],["move","$v0, $zero",1],["LABEL",".L_loop:"],["lw","$v1, 0($a0)"],
+     ["addiu","$a1, $a1, -1"],["addiu","$a0, $a0, 4"],["bnez","$a1, .L_loop"],
+     ["addu","$v0, $v0, $v1",1],["LABEL",".L_end:"],["jr","$ra"],["nop","",1]],
+sig:"int f(int *p, int n)",
+hint:"Declare an accumulator, loop n times adding p[i], return it. Name your variables anything.",
+answers:["int s=0;int i;for(i=0;i<n;i++)s+=p[i];return s;",
+         "int s=0;int i;for(i=0;i<n;i++){s+=p[i];}return s;",
+         "int s;int i;s=0;for(i=0;i<n;i++)s+=p[i];return s;",
+         "int s=0;while(n>0){s+=*p;p++;n--;}return s;",
+         "int s=0;int i=0;while(i<n){s+=p[i];i++;}return s;"],
+teach:`<p>Two details worth keeping. The pointer advancing by 4 rather than 1 is the element size, so this
+is an array of 4-byte values. And the accumulator being zeroed in the <em>guard's</em> delay slot means it
+is correctly zero on the skip path too — which is why calling this with a count of zero returns 0 rather
+than garbage.</p>`},
+
+{ch:6,kind:"ex",title:"Writing in a loop",loose:true,
+body:`<p>Same skeleton with a store instead of a load, and nothing accumulating. <code>$zero</code> supplies
+the value being written, so the constant in the C is 0.</p>`,
+asm:[["blez","$a1, .L_end"],["nop","",1],["LABEL",".L_loop:"],["addiu","$a1, $a1, -1"],
+     ["sw","$zero, 0($a0)"],["bnez","$a1, .L_loop"],["addiu","$a0, $a0, 4",1],
+     ["LABEL",".L_end:"],["jr","$ra"],["nop","",1]],
+sig:"void f(int *p, int n)",hint:"A loop with one statement in it, and no return.",
+answers:["int i;for(i=0;i<n;i++)p[i]=0;","int i;for(i=0;i<n;i++){p[i]=0;}",
+         "int i=0;while(i<n){p[i]=0;i++;}","while(n>0){*p=0;p++;n--;}",
+         "int i;for(i=0;i<n;i++)*p++=0;","while(n--)*p++=0;","while(n--){*p++=0;}","while(n-->0)*p++=0;"],
+teach:`<p>This is a hand-written clear loop rather than a call to <code>memset</code>, and which one the
+original used is visible: a library call would appear as a <code>jal</code>. Old game code wrote these out
+by hand constantly, partly to avoid the call overhead and partly because the library was not always
+worth trusting.</p>`},
+
+{ch:6,kind:"ex",title:"Copying between two arrays",loose:true,
+body:`<p>Two pointers now, each advancing by one element per pass. Read which one is loaded and which one
+is stored — that decides which parameter is the destination.</p>`,
+asm:[["blez","$a2, .L_end"],["nop","",1],["LABEL",".L_loop:"],["lw","$v0, 0($a1)"],
+     ["addiu","$a2, $a2, -1"],["addiu","$a1, $a1, 4"],["sw","$v0, 0($a0)"],
+     ["bnez","$a2, .L_loop"],["addiu","$a0, $a0, 4",1],["LABEL",".L_end:"],["jr","$ra"],["nop","",1]],
+sig:"void f(int *dst, int *src, int n)",hint:"The load comes from $a1 and the store goes to $a0.",
+answers:["int i;for(i=0;i<n;i++)dst[i]=src[i];","int i;for(i=0;i<n;i++){dst[i]=src[i];}",
+         "int i=0;while(i<n){dst[i]=src[i];i++;}","while(n>0){*dst=*src;dst++;src++;n--;}",
+         "int i;for(i=0;i<n;i++)*dst++=*src++;","while(n--)*dst++=*src++;","while(n--){*dst++=*src++;}"],
+teach:`<p>Argument order is a real decision you have to get right, and the assembly settles it: whatever is
+stored to is the destination. C's own convention puts destination first, which is why
+<code>memcpy(dst, src, n)</code> reads the way it does, and most game code follows it.</p>`},
+
+/* ============ chapter 7 — globals ============ */
+{ch:7,kind:"concept",title:"Reaching a fixed address takes two instructions",
+body:`<p>Every instruction is 4 bytes, and the opcode and register fields eat half of that, so the largest
+constant that fits inside one is 16 bits. A full 32-bit address does not fit. Building one therefore takes
+two instructions: load the top half, then supply the bottom half.</p>
+<p><code>lui</code>, "load upper immediate", puts a 16-bit value into the top half of a register and zeros
+the bottom. The low half then arrives either as an <code>ori</code> or — more often — folded into the
+offset field of the load or store that follows, which costs nothing extra.</p>
+<p>The assembler writes the two halves as <code>%hi(symbol)</code> and <code>%lo(symbol)</code>. There is one
+trap in them, and it accounts for an enormous share of nearly-matching diffs: offsets are <b>signed</b>, so
+when the low half has its top bit set it will be applied as a negative number, and <code>%hi</code>
+compensates by adding one. Seeing <code>lui $v0, 0x8002</code> paired with a negative offset is not a bug —
+it is that carry.</p>`},
+
+{ch:7,kind:"ex",title:"Reading a global",
+body:`<p>The classic pair. <code>lui</code> gets the top half of the address, then the load's offset field
+carries the bottom half and fetches the value in the same instruction.</p>
+<pre class="pre" style="padding:10px 0 4px">extern int g_frame;</pre>`,
+asm:[["lui","$v0, %hi(g_frame)"],["lw","$v0, %lo(g_frame)($v0)"],["jr","$ra"],["nop","",1]],
+sig:"int f(void)",hint:"Two instructions, one variable, no arguments.",
+answers:["return g_frame;"],
+teach:`<p>A global is just a fixed address the linker fills in. In a real project the symbol has no name
+yet — you see <code>lui $v0, 0x8009</code> and <code>lw $v0, -0x6a20($v0)</code>, work out the address
+those build, and give it a name in your symbol list. Naming globals is a large part of the early work on
+any decomp.</p>`},
+
+{ch:7,kind:"ex",title:"Writing a global",
+body:`<p>Same address build, store instead of load. Note the register holding the address and the register
+holding the value are different — <code>$v0</code> is only being borrowed as scratch for the address.</p>
+<pre class="pre" style="padding:10px 0 4px">extern int g_frame;</pre>`,
+asm:[["lui","$v0, %hi(g_frame)"],["sw","$a0, %lo(g_frame)($v0)"],["jr","$ra"],["nop","",1]],
+sig:"void f(int x)",hint:"One assignment.",
+answers:["g_frame=x;"],
+teach:`<p>A global written from several functions and read from many more is the normal texture of 1990s
+game code. When you find one, search the rest of the binary for the same address — every hit is another
+function that will need the same symbol name, and the set of them usually reveals what it is for.</p>`},
+
+{ch:7,kind:"ex",title:"Updating a global in place",
+body:`<p>Read, modify, write. The address is built once and reused for both the load and the store, because
+the compiler knows it has not changed.</p>
+<pre class="pre" style="padding:10px 0 4px">extern int g_count;</pre>`,
+asm:[["lui","$v1, %hi(g_count)"],["lw","$v0, %lo(g_count)($v1)"],["addiu","$v0, $v0, 1"],
+     ["sw","$v0, %lo(g_count)($v1)"],["jr","$ra"],["nop","",1]],
+sig:"void f(void)",hint:"The shortest way a C programmer writes this.",
+answers:["g_count++;","g_count+=1;","g_count=g_count+1;","++g_count;"],
+teach:`<p>All the spellings compile identically here because the result is not used. They differ only when
+the value is consumed in the same expression — <code>x = g_count++</code> versus
+<code>x = ++g_count</code> — and that difference does show up in the instructions.</p>`},
+
+{ch:7,kind:"ex",title:"Indexing a global array",
+body:`<p>This time the low half arrives as a separate <code>addiu</code> rather than in the load's offset,
+because the offset field is needed for the index instead. So the address is fully built first, then the
+scaled index is added to it.</p>
+<pre class="pre" style="padding:10px 0 4px">extern int g_table[];</pre>`,
+asm:[["lui","$v0, %hi(g_table)"],["addiu","$v0, $v0, %lo(g_table)"],["sll","$v1, $a0, 2"],
+     ["addu","$v0, $v0, $v1"],["lw","$v0, 0($v0)"],["jr","$ra"],["nop","",1]],
+sig:"int f(int i)",hint:"Five instructions, one indexing expression.",
+answers:["return g_table[i];","return *(g_table+i);"],
+teach:`<p>When you see <code>lui</code> followed by <code>addiu</code> with a <code>%lo</code>, the code
+wanted the <em>address</em> rather than the contents — an array base, a struct base, or a pointer being
+passed to something. When the <code>%lo</code> is inside a load or store instead, it wanted the value.</p>`},
+
+/* ============ chapter 8 — the PSP ============ */
+{ch:8,kind:"concept",title:"Same language, newer dialect",
+body:`<p>Everything up to this point transfers to the PSP unchanged. Its CPU — Sony's <b>Allegrex</b> — is
+still MIPS, still 32-bit, still little-endian, still o32, still has delay slots, still uses
+<code>$a0</code>–<code>$a3</code>, <code>$v0</code> and <code>$ra</code> the same way. The instructions you
+have been reading are the same instructions.</p>
+<p>What is added:</p>
+<ul>
+<li><b>A real floating-point unit.</b> 32 float registers <code>$f0</code>–<code>$f31</code>, single
+precision only. <code>double</code> still goes through software helper calls, so it is as expensive as it
+was on PS1 — but <code>float</code> is now cheap, and PSP game code uses it freely where PS1 code was
+forced into fixed point.</li>
+<li><b>The VFPU</b>, a 128-bit vector unit for 3D maths. The rough equivalent of the PS1's GTE, and it has
+its own register file and its own alarming syntax.</li>
+<li><b>MIPS32r2 instructions</b> the R3000A never had: bitfield extract and insert, byte and halfword
+sign-extension, conditional moves that avoid branching, multiply-accumulate. Several idioms you learned as
+multi-instruction sequences collapse into one instruction.</li>
+</ul>
+<p>What is harder: the compilers are newer and optimise more aggressively, the binaries are far larger, and
+the community tooling is thinner than the PS1 scene's. The reading skill is the same. The project management
+around it is the real difference.</p>`},
+
+{ch:8,kind:"ex",title:"Floats have their own registers",plat:"Allegrex (PSP) · COP1",
+body:`<p>Float arguments arrive in <code>$f12</code> and <code>$f14</code>, and the result goes back in
+<code>$f0</code> — a completely separate set of registers from the integer ones, with their own load, store
+and move instructions.</p>
+<p>The <code>.s</code> suffix means single precision. A <code>.d</code> suffix would mean double, and on
+this hardware you will rarely see one.</p>`,
+asm:[["add.s","$f0, $f12, $f14"],["jr","$ra"],["nop","",1]],
+sig:"float f(float a, float b)",hint:"Exactly what it looks like.",
+answers:["return a+b;"],
+teach:`<p>The float instruction set mirrors the integer one closely: <code>add.s sub.s mul.s div.s</code>,
+<code>mov.s</code> to copy, <code>neg.s</code> and <code>abs.s</code>, <code>lwc1</code> and
+<code>swc1</code> to load and store. Unlike the integer side there is a real divide instruction, so
+<code>/</code> on floats is one instruction rather than a blob.</p>`},
+
+{ch:8,kind:"ex",title:"Crossing between integer and float",plat:"Allegrex (PSP) · COP1",
+body:`<p>The two register files cannot see each other, so converting a number means physically moving it
+across and then reinterpreting it. <code>mtc1</code> — "move to coprocessor 1" — copies the raw bits of an
+integer register into a float register without changing them. <code>cvt.s.w</code> then converts those bits,
+read as a <b>w</b>ord, into a <b>s</b>ingle-precision float.</p>
+<p>Two steps, because moving and converting are genuinely different operations.</p>`,
+asm:[["mtc1","$a0, $f0"],["nop","",1],["cvt.s.w","$f0, $f0"],["jr","$ra"],["nop","",1]],
+sig:"float f(int a)",hint:"A conversion. C will do it implicitly, but you can write it explicitly too.",
+answers:["return (float)a;","return a;"],
+teach:`<p>Going the other way is <code>cvt.w.s</code> followed by <code>mfc1</code>, and it truncates toward
+zero like a C cast. If you see <code>mtc1</code> with no conversion after it, the code is reinterpreting the
+bits rather than converting the value — the float-bit-hacking trick, which shows up in fast
+inverse-square-root style code.</p>`},
+
+{ch:8,kind:"ex",title:"Comparing floats sets a flag",plat:"Allegrex (PSP) · COP1",
+body:`<p>Here the FPU breaks the pattern you learned on the integer side. <code>c.lt.s</code> does not write
+a register — it sets a hidden condition bit inside the FPU, and <code>bc1f</code> ("branch on FP condition
+false") reads it. The one place this machine does have a flag.</p>
+<p>Trace it: if <code>a &lt; b</code> is false, branch away with <code>b</code> already loaded into the
+return register by the delay slot. Otherwise fall through and overwrite it with <code>a</code>.</p>`,
+asm:[["c.lt.s","$f12, $f14"],["bc1f",".L_end"],["mov.s","$f0, $f14",1],["mov.s","$f0, $f12"],
+     ["LABEL",".L_end:"],["jr","$ra"],["nop","",1]],
+sig:"float f(float a, float b)",hint:"Which of the two comes back when a < b?",
+answers:["return a<b?a:b;","return(a<b)?a:b;","return a>b?b:a;","if(a<b)return a;return b;"],
+teach:`<p>The comparison family is <code>c.eq.s</code>, <code>c.lt.s</code> and <code>c.le.s</code>, with
+<code>bc1t</code> and <code>bc1f</code> to branch on the result. There is no "greater than" — the compiler
+swaps the operands instead, so a comparison with its arguments the wrong way round in the assembly is
+usually a <code>&gt;</code> in the source.</p>`},
+
+{ch:8,kind:"ex",title:"Choosing without branching",plat:"Allegrex (PSP) · MIPS32r2",
+body:`<p><code>movn</code> is a conditional move: "move if not zero". <code>movn $v0, $a1, $a0</code> copies
+<code>$a1</code> into <code>$v0</code> only when <code>$a0</code> is nonzero, and does nothing otherwise.</p>
+<p>So the code sets up the fallback first, then conditionally overwrites it. No branch, no delay slot, no
+pipeline disruption — which is exactly why the instruction was added.</p>`,
+asm:[["move","$v0, $a2"],["movn","$v0, $a1, $a0"],["jr","$ra"],["nop","",1]],
+sig:"int f(int cond, int a, int b)",hint:"Three arguments, one conditional expression.",
+answers:["return cond?a:b;","return cond!=0?a:b;","if(cond)return a;return b;"],
+teach:`<p>Its twin is <code>movz</code>, "move if zero". On the R3000A this same C would have compiled to a
+branch and a label, so the <em>shape</em> of an ordinary ternary differs between the two consoles even
+though the C is identical. That is the main flavour of what changes when you move up to the PSP.</p>`},
+
+{ch:8,kind:"ex",title:"Bitfields in one instruction",plat:"Allegrex (PSP) · MIPS32r2",
+body:`<p><code>ext</code> extracts a run of bits: <code>ext $v0, $a0, 8, 4</code> means take 4 bits starting
+at position 8 of <code>$a0</code>, and right-align them in <code>$v0</code>.</p>
+<p>On the PS1 this took a shift and a mask. Here it is one instruction, so the packed-field idiom you
+learned in chapter 3 looks completely different — but the C that produces it is the same.</p>`,
+asm:[["ext","$v0, $a0, 8, 4"],["jr","$ra"],["nop","",1]],
+sig:"int f(int x)",hint:"Shift down by the position, then mask to the width. 4 bits is 0xF.",
+answers:["return (x>>8)&0xf;","return (x>>8)&15;","return(x>>8)&0xF;"],
+teach:`<p>Its counterpart <code>ins</code> inserts a field into place, which is the compiled form of
+<code>x = (x &amp; ~mask) | (val &lt;&lt; pos)</code>. Both also turn up when the original C used real
+bitfield syntax inside a struct, so an <code>ext</code> is a hint that the struct may have declared
+<code>unsigned int kind : 4;</code> rather than doing the masking by hand.</p>`},
+
+{ch:8,kind:"ex",title:"Sign-extending in one step",plat:"Allegrex (PSP) · MIPS32r2",
+body:`<p><code>seb</code> — "sign-extend byte" — takes the low byte of a register and fills the upper 24 bits
+with copies of its top bit. On the R3000A this needed a pair of shifts, left 24 then arithmetic right 24.</p>
+<p>The C that produces it is a cast down to a signed byte type and back.</p>`,
+asm:[["seb","$v0, $a0"],["jr","$ra"],["nop","",1]],
+sig:"int f(int x)",hint:"Cast to a one-byte signed type.",
+answers:["return (signed char)x;","return (char)x;","return (s8)x;"],
+teach:`<p><code>seh</code> does the same for halfwords. Seeing either one means a value was deliberately
+narrowed and then widened again, which almost always means it came from or is going into a small struct
+field — useful evidence when you are reconstructing a type.</p>`},
+
+{ch:8,kind:"concept",title:"The VFPU, and when to care",
+body:`<p>The VFPU is the PSP's vector unit: 128 registers viewable as scalars, 4-element vectors or 4×4
+matrices, with instructions that transform a whole matrix in one go. Its syntax is unlike anything else in
+MIPS — register names like <code>C000</code> and <code>R101</code>, prefix modifiers that swizzle and negate
+operands before the operation runs.</p>
+<p>The practical position for someone starting out:</p>
+<ul>
+<li>Most game logic contains no VFPU at all. Menus, state machines, inventory, save data, text, AI
+bookkeeping — ordinary integer code.</li>
+<li>Where it does appear, it is concentrated in maths and rendering helpers, often only a handful of
+functions, and frequently in library code rather than game code.</li>
+<li>Compilers of that era emitted very little of it on their own. A lot of PSP VFPU code was written by hand
+as inline assembly, which means in a decomp it often stays as inline assembly — you are not required to
+find C that produces it.</li>
+</ul>
+<p>So it is not a wall in front of you. It is a small region you can route around for a long time, and learn
+only if the particular functions you care about turn out to need it.</p>`},
+
+/* ============ chapter 9 — a real game ============ */
+{ch:9,kind:"concept",title:"Choosing a first target",
+body:`<p>A decomp project is not one problem, it is two: reading functions, which is what this trainer
+teaches, and running a project, which is everything else. The second one decides whether you finish.</p>
+<p>What makes a target tractable:</p>
+<ul>
+<li><b>An existing project to join.</b> Enormously easier than starting alone — the build system, the
+compiler settings and the symbol list already exist, and there are people who know why a particular function
+refuses to match.</li>
+<li><b>A known compiler.</b> Matching is impossible until you have the right compiler and flags, and finding
+them is guesswork you do before any real work starts.</li>
+<li><b>Debug symbols, or a sibling release that has them.</b> Some games shipped with symbol tables left in.
+It changes the difficulty enormously.</li>
+<li><b>Size.</b> A late-generation game can be tens of megabytes of code. That is not a first project; it is
+a decade-long one with a team.</li>
+</ul>
+<p>A card-based strategy game from 2004 is a reasonable shape for this — heavy on menus, state machines and
+data tables, light on the rendering maths that gets ugly. What you cannot know from the outside is which
+compiler built it and whether anyone has done the groundwork. Check both before committing.</p>`},
+
+{ch:9,kind:"concept",title:"Getting to code you can read",
+body:`<p>The path from a disc image to instructions on a screen, in order:</p>
+<ul>
+<li><b>Mount or extract the ISO.</b> UMD images are a standard filesystem; ordinary tools read them.</li>
+<li><b>Find the executable.</b> Usually <code>EBOOT.BIN</code>, sometimes with additional
+<code>.prx</code> modules alongside it. Retail executables are encrypted, so this step needs a tool that
+produces the decrypted ELF before anything else can read it.</li>
+<li><b>Load the ELF into a disassembler.</b> Ghidra reads Allegrex; so does IDA with the right processor
+module. This is where you explore, rename things and form a picture, not where you match.</li>
+<li><b>Extract one function's assembly as text</b> and get it into a diffing setup.</li>
+</ul>
+<p>Two things to check early, because they change everything: whether the executable still contains a symbol
+table, and whether the module imports are named. Sony's own library calls are usually identifiable by import
+name even in a stripped binary, and every one you identify is a function you never have to decompile.</p>`},
+
+{ch:9,kind:"concept",title:"Finding the compiler",
+body:`<p>Matching is meaningless until you know what built the game. PSP titles of that era were built with
+either a GCC-based toolchain from the official SDK or SN Systems' compiler, at various versions, with flags
+you also have to guess. The wrong compiler produces code that is close but never identical, and you will
+burn weeks blaming your C.</p>
+<p>How it is actually established:</p>
+<ul>
+<li>Take a short leaf function whose behaviour is obvious — a getter, a small maths helper — and write the C
+for it.</li>
+<li>Run it through each candidate compiler and flag combination and compare instruction for instruction.</li>
+<li>Look at the differences rather than just pass or fail. Register allocation order, whether temporaries
+are reused, how the prologue is laid out and where the frame pointer goes are all fingerprints that
+distinguish toolchains.</li>
+<li>Leftover strings sometimes name the toolchain outright. Worth searching the binary for early.</li>
+</ul>
+<p>Once a handful of unrelated functions all match with the same settings, you have your compiler and the
+project can start.</p>`},
+
+{ch:9,kind:"concept",title:"The loop you will actually live in",
+body:`<p>Day to day, a decomp is one repeating cycle, and it is short:</p>
+<ul>
+<li>Pick a function. Early on, the shortest leaf you can find.</li>
+<li>Write C for it and compile.</li>
+<li>Run a diff tool that shows your instructions beside the original, aligned, with differences coloured.
+This is the centre of the whole workflow — never compare by eye in two windows.</li>
+<li>Change the C and repeat until the diff is empty.</li>
+</ul>
+<p>When a function is stubbornly close but not equal, there are standard moves: reorder local declarations,
+since declaration order often decides register allocation; split or combine expressions; change a type's
+signedness or width; try the loop written as <code>while</code> instead of <code>for</code>. There are also
+automated permuters that mutate your C in exactly these ways and search for a match, which are worth
+reaching for after you have tried a few by hand.</p>
+<p>For single functions and for learning, decomp.me gives you the whole cycle in a browser with no setup,
+and its scratch list is full of other people's attempts to read.</p>
+<p>What makes a project survive is unglamorous: get a build that reproduces the original binary from your
+sources working before matching anything serious, keep a symbol list as you go, and commit small. The
+functions are the easy part.</p>`},
+
+{ch:9,kind:"concept",title:"Where this leaves you",
+body:`<p>You have the reading vocabulary: registers and the return value, immediates, the shift-and-add
+tricks that stand in for multiply and divide, masks and packed fields, the five load widths and what each
+says about a type, offsets as struct fields, scaled indexing, comparisons as values, branches and their
+delay slots, stack frames and what a prologue tells you, the loop skeleton, two-instruction address builds,
+and the handful of things the PSP adds on top.</p>
+<p>That is enough to read most of an ordinary game function. What remains is volume — the fluency that comes
+from doing it a few hundred times, which no amount of explanation substitutes for.</p>
+<p>Two things worth doing next, in this order. Take a real function from a game you care about into
+decomp.me and fail at it for a while; the failure teaches faster than these exercises can. And go and read
+finished code in a public decomp project, matching the C against the assembly beside it, because seeing what
+a completed function looks like tells you what you are aiming at.</p>`}
+
+];
+
+/* ---------- C-side notes, keyed by lesson title ---------- */
+const CNOTE = {
+"Hand the argument straight back":
+`<p>The shape of every C function:</p>
+<pre><span class="k">int</span> f(<span class="k">int</span> a)   <span class="c">/* returns an int, takes one int called a */</span>
+{
+    <span class="k">return</span> a;   <span class="c">/* hand a back and stop here */</span>
+}</pre>
+<p>The type before the name is what the function gives back. The names inside the parentheses are the
+parameters — inside the body they behave like ordinary local variables that arrived pre-filled.
+<code>return</code> both supplies the value and ends the function immediately.</p>
+<p>Every statement ends in a semicolon. Leaving one off is the single most common C error, and the message
+you get points at the <em>next</em> line, not the guilty one.</p>`,
+
+"Adding a constant":
+`<p>C's arithmetic operators are <code>+ - * / %</code>, and they work the way you expect on integers with
+one exception: <code>/</code> between two integers throws the fraction away. <code>7 / 2</code> is 3, not
+3.5.</p>
+<p>A bare number in the source is a <b>literal</b>. Write it in decimal (<code>5</code>) or hex
+(<code>0x5</code>) — identical to the compiler, so pick whichever makes the intent clearer. Hex for bit
+patterns and hardware addresses, decimal for counts.</p>`,
+
+"There is no subtract-immediate":
+`<p>Write what you mean: <code>a - 12</code>, not <code>a + (-12)</code>. They compile identically, and the
+first is what a human wrote.</p>
+<p>This is the general habit for matching work. The compiler flattens a lot of surface differences, so
+between two versions that produce the same instructions, choose the one that reads like the original
+programmer's intent.</p>`,
+
+"Adding two registers":
+`<p>Parameters in C are passed <b>by value</b>: the function gets a private copy. Assigning to
+<code>a</code> inside the function changes nothing for the caller.</p>
+<pre><span class="k">int</span> f(<span class="k">int</span> a, <span class="k">int</span> b)
+{
+    a = a + b;   <span class="c">/* legal, but only changes this copy */</span>
+    <span class="k">return</span> a;
+}</pre>
+<p>That's why pointers exist: passing an address is how a function reaches something the caller owns.
+Chapter 4 gets there.</p>`,
+
+"Subtraction, and why order matters":
+`<p>Operator precedence, from tightest to loosest, for what you will actually meet:</p>
+<pre>unary  - ~ !  *p  &amp;x
+       *  /  %
+       +  -
+       &lt;&lt; &gt;&gt;
+       &lt;  &gt;  &lt;=  &gt;=
+       == !=
+       &amp;
+       ^
+       |
+       &amp;&amp;
+       ||
+       ?:
+       =</pre>
+<p>Two surprises worth burning in: shifts bind <em>looser</em> than <code>+</code>, so
+<code>a &lt;&lt; 2 + 1</code> means <code>a &lt;&lt; 3</code>. And the bitwise operators bind looser than
+comparisons, so <code>x &amp; 1 == 0</code> means <code>x &amp; (1 == 0)</code>, which is always 0.
+Parenthesise anything mixing bitwise with comparison, always.</p>`,
+
+"Negation uses the zero register":
+`<p><code>-a</code> is the unary minus — one operand, applied to what follows it. Don't confuse it with the
+subtraction <code>a - b</code>, which needs two. The same character does both jobs and the compiler works
+out which from context.</p>`,
+
+"Multiplying by a power of two":
+`<p>You could write <code>a &lt;&lt; 3</code> and get the same instruction, but prefer <code>a * 8</code>.
+Hand-optimising multiplies into shifts was a real habit in 1997, so you will occasionally find genuine
+<code>&lt;&lt;</code> in original sources — but the compiler does that conversion for free, and the
+multiply says what the code <em>means</em>. Reserve <code>&lt;&lt;</code> for when you are genuinely moving
+bits around rather than scaling a number.</p>`,
+
+"Multiplying two registers":
+`<p>Watch for overflow: <code>int</code> is 32 bits, so <code>100000 * 100000</code> does not fit and the
+result silently wraps. C does not check. On a 33 MHz console nobody could afford a check, which is why
+PS1 code leans on fixed-point scaling to keep values in range instead.</p>`,
+
+"A constant that isn't a power of two":
+`<p><code>sizeof</code> is the C operator that gives a type's size in bytes — <code>sizeof(int)</code> is 4,
+and <code>sizeof(Actor)</code> is however many bytes that struct occupies including padding. When you work
+a stride like 28 out of the assembly, <code>sizeof</code> is the thing you are recovering, and getting it
+right is what makes every array index in the rest of the function come out correct.</p>`,
+
+"An unsigned divide is one shift":
+`<p>The integer types you will use, and what each one means here:</p>
+<pre><span class="k">unsigned char</span>    1 byte   0 … 255            <span class="c">u8</span>
+<span class="k">signed char</span>      1 byte   -128 … 127         <span class="c">s8</span>
+<span class="k">unsigned short</span>   2 bytes  0 … 65535          <span class="c">u16</span>
+<span class="k">short</span>            2 bytes  -32768 … 32767     <span class="c">s16</span>
+<span class="k">unsigned int</span>     4 bytes  0 … 4294967295     <span class="c">u32</span>
+<span class="k">int</span>              4 bytes  ±2.1 billion       <span class="c">s32</span></pre>
+<p>Real PS1 decomp projects typedef the short names on the right and use those exclusively, because
+<code>u8</code> states the width and the signedness at a glance while <code>char</code> leaves both to a
+compiler default. Copy the habit.</p>`,
+
+"A signed divide is not one shift":
+`<p>Signedness changes the generated code, so it is never a cosmetic choice. Same expression, different
+type, different instructions — and in matching work that means a wrong type shows up as a failed match
+rather than as a subtle runtime bug. Useful feedback, for once.</p>
+<p>Practical rule: use unsigned for things that count or index or hold bit patterns, signed for things that
+can legitimately go below zero like coordinates and deltas.</p>`,
+
+"Real division, and the trap":
+`<p>Dividing by zero in C is undefined behaviour — the standard permits anything at all. GCC's generated
+check turns it into a deliberate crash rather than silent garbage, which is friendlier, but the fix is to
+not do it: guard the divisor yourself when it could be zero.</p>
+<p>Also note division is expensive here, roughly thirty-five cycles. Per-frame game code avoids it,
+preferring a multiply by a precomputed reciprocal or a shift.</p>`,
+
+"Modulo comes free with the divide":
+`<p><code>%</code> gives the remainder, and its sign follows the left operand: <code>-7 % 3</code> is −1.
+The classic use is wrapping a counter, <code>i = (i + 1) % n</code>.</p>
+<p>When <code>n</code> is a power of two, <code>x % 8</code> and <code>x &amp; 7</code> are the same thing
+for unsigned values, and the second is far cheaper. For signed values they differ on negatives, which is
+exactly why the compiler emits more instructions for a signed modulo.</p>`,
+
+"Keeping only some bits":
+`<p>Do not confuse <code>&amp;</code> with <code>&amp;&amp;</code>. The single one is bitwise: it works on
+every bit position independently. The double one is logical: it treats both sides as true/false and
+short-circuits, skipping the right side entirely if the left already decided the answer. Same for
+<code>|</code> versus <code>||</code>.</p>
+<p>Mixing them up compiles fine and produces wrong answers, which is why it is worth a moment's care every
+time you type one.</p>`,
+
+"Turning a bit on":
+`<p>The compound assignment operators save repeating the variable:</p>
+<pre>flags |= 0x10;   <span class="c">/* set the bit    — flags = flags | 0x10  */</span>
+flags &amp;= ~0x10;  <span class="c">/* clear the bit  — ~ flips every bit      */</span>
+flags ^= 0x10;   <span class="c">/* toggle the bit                          */</span></pre>
+<p>These exist for <code>+= -= *= /= %= &lt;&lt;= &gt;&gt;=</code> too, and they compile to exactly the
+same thing as the long form. Use them — less to read, and no chance of typing the wrong variable on one
+side.</p>`,
+
+"Flipping bits":
+`<p>Bit positions are usually written as a shift rather than a raw number, because
+<code>1 &lt;&lt; 4</code> says "bit 4" while <code>0x10</code> makes you count. Original game sources
+often used <code>#define</code> names:</p>
+<pre>#define FLAG_ACTIVE   (1 &lt;&lt; 0)
+#define FLAG_VISIBLE  (1 &lt;&lt; 1)
+#define FLAG_HOSTILE  (1 &lt;&lt; 4)</pre>
+<p>A <code>#define</code> is pure text substitution done before compiling, so it costs nothing at runtime
+and produces identical instructions to writing the number.</p>`,
+
+"Reading a flag":
+`<p>C's notion of truth: <b>zero is false, anything else is true</b>. There is no separate boolean type in
+this dialect. So <code>if (flags &amp; 4)</code> works directly — no need to write
+<code>!= 0</code>, though it is harmless and some codebases insist on it.</p>
+<p>This is also why <code>if (p)</code> and <code>if (p != NULL)</code> are the same test on a pointer.</p>`,
+
+"Packing two values into one word":
+`<p>Parenthesise the shift. <code>(hi &lt;&lt; 16) | lo</code> is correct and clear;
+<code>hi &lt;&lt; 16 | lo</code> happens to work because <code>&lt;&lt;</code> binds tighter than
+<code>|</code>, but nobody should have to remember that to read your line.</p>
+<p>Unpacking is the reverse: <code>(packed &gt;&gt; 16) &amp; 0xFFFF</code> for the high half,
+<code>packed &amp; 0xFFFF</code> for the low. Shift down first, then mask.</p>`,
+
+"Following a pointer":
+`<p>The two places a star appears, and why they look the same but aren't:</p>
+<pre><span class="k">int</span> *p;      <span class="c">/* declaration: p is a pointer to an int */</span>
+x = *p;      <span class="c">/* use: fetch the int that p points at   */</span>
+p = &amp;x;      <span class="c">/* &amp; goes the other way: address of x    */</span></pre>
+<p>In a declaration the star describes the type. Everywhere else it is the dereference operator, meaning
+"go and get it". Read <code>int *p</code> as "<code>*p</code> is an int" and the syntax stops fighting
+you.</p>
+<p>Declaring a pointer does not create anything to point at. A pointer you never assigned holds garbage,
+and dereferencing it reads a random address — the classic cause of a crash with a nonsense address in it.</p>`,
+
+"The load instruction is the type declaration":
+`<p>A pointer's type controls two things: how many bytes a dereference reads, and how much
+<code>p + 1</code> moves. Same address, different type, different behaviour.</p>
+<pre><span class="k">unsigned char</span> *b;   <span class="c">/* *b reads 1 byte;  b+1 moves 1 byte  */</span>
+<span class="k">int</span>           *w;   <span class="c">/* *w reads 4 bytes; w+1 moves 4 bytes */</span></pre>
+<p>Pointer arithmetic is always in units of the pointed-to type, never in bytes. This trips up everyone
+returning to C, and it is exactly what the shift in an indexing sequence is doing.</p>`,
+
+"A signed byte fills with ones":
+`<p>A cast converts between types: <code>(unsigned char)x</code> keeps the low byte and drops the rest,
+<code>(int)b</code> widens a byte back out. Casts are also how you reinterpret a pointer:
+<code>(unsigned char *)p</code> lets you walk a structure byte by byte.</p>
+<p>Use them deliberately. A cast silences the compiler's type checking, so a wrong one hides a real bug
+instead of reporting it.</p>`,
+
+"Writing through a pointer":
+`<p><code>*p = x;</code> means "store x at the address p holds". The dereference appears on the left of the
+assignment, where it names a destination rather than producing a value.</p>
+<p>A function returning <code>void</code> returns nothing. It can still end early with a bare
+<code>return;</code>, and it needs no <code>return</code> at all at the end.</p>
+<p>This is also the answer to "how does a function change something in the caller" — pass an address,
+write through it.</p>`,
+
+"A constant index is folded into the offset":
+`<p><code>p[4]</code> and <code>*(p + 4)</code> are the same thing by definition; the brackets are
+shorthand. Both mean "four elements along", not four bytes.</p>
+<p>Prefer the brackets when you are treating memory as an array and the star when you are treating it as a
+single object. The instructions are identical, so this is purely about the next person reading it.</p>
+<p>C does not check bounds. <code>p[400]</code> on a ten-element array compiles happily and reads whatever
+is there.</p>`,
+
+"A variable index has to be scaled":
+`<p>Arrays and pointers are nearly interchangeable in expressions: an array name used in one turns into a
+pointer to its first element. So the same <code>p[i]</code> works whether <code>p</code> was declared as
+<code>int *p</code> or <code>int p[10]</code>.</p>
+<p>The difference is what they own. An array is storage; a pointer is only an address. And an array loses
+its length the moment it becomes a pointer, which is why C functions taking arrays nearly always take a
+count alongside — the <code>(pointer, length)</code> pair you see everywhere.</p>`,
+
+"Struct fields are just offsets":
+`<p>Defining and using a struct:</p>
+<pre><span class="k">typedef struct</span> {
+    <span class="k">int</span> x;
+    <span class="k">int</span> hp;
+} Actor;
+
+Actor  a;        <span class="c">/* an actor, by value        */</span>
+Actor *p = &amp;a;   <span class="c">/* a pointer to one          */</span>
+
+a.hp = 100;      <span class="c">/* dot   — through the value */</span>
+p-&gt;hp = 100;     <span class="c">/* arrow — through a pointer */</span></pre>
+<p>That is the whole distinction: dot when you have the struct, arrow when you have its address.
+<code>p-&gt;hp</code> is exact shorthand for <code>(*p).hp</code>, which is why the arrow exists — the
+parentheses are needed because dot binds tighter than the star.</p>
+<p>The <code>typedef</code> is what lets you write <code>Actor</code> instead of
+<code>struct Actor</code> everywhere. Game code almost always uses it.</p>`,
+
+"Narrow fields, and the holes between them":
+`<p>Field order in the source is field order in memory — the compiler never rearranges them. That is what
+makes struct recovery possible at all, and it means declaration order is something you have to get right
+when matching, not just a style choice.</p>
+<p>Ordering fields largest-first is the usual efficiency habit, since it minimises the padding between
+them. But when you are reconstructing an original struct, the offsets in the assembly dictate the order —
+including any padding the original programmer accidentally left in.</p>`,
+
+"Comparison is a value, not a flag":
+`<p>A comparison in C produces an <code>int</code>: exactly 1 when true, exactly 0 when false. So
+<code>return a &lt; b;</code> is a perfectly ordinary thing to write, not a trick.</p>
+<p>The trap in the other direction: <code>=</code> assigns, <code>==</code> compares.
+<code>if (x = 5)</code> sets x to 5 and is always true. It compiles without complaint.</p>`,
+
+"Comparing against a constant":
+`<p>All six comparisons: <code>&lt; &gt; &lt;= &gt;= == !=</code>. Nothing exotic, but two
+reminders.</p>
+<p>Comparing a signed value against an unsigned one silently converts the signed one to unsigned, so a
+negative number becomes enormous and the test comes out backwards. Keep both sides the same signedness.</p>
+<p>And chained comparisons don't work as written — <code>0 &lt;= x &lt; 10</code> is legal C that does not
+mean what it looks like. Write <code>x &gt;= 0 &amp;&amp; x &lt; 10</code>.</p>`,
+
+"The early return":
+`<p>The guard clause pattern: handle the impossible case first and leave, so the rest of the function can
+assume things are fine.</p>
+<pre><span class="k">int</span> f(<span class="k">int</span> *p)
+{
+    <span class="k">if</span> (p == NULL) {
+        <span class="k">return</span> 0;
+    }
+    <span class="k">return</span> *p;
+}</pre>
+<p><code>NULL</code> is just 0 with a name that says "pointer". <code>if (!p)</code> means the same
+thing.</p>
+<p>Braces are optional around a single statement but put them in anyway — the most famous bug class in C
+comes from adding a second line to a braceless <code>if</code> and having it run unconditionally. The
+generated code is identical either way.</p>`,
+
+"Picking the larger of two":
+`<p>The conditional operator packs an if/else into an expression:</p>
+<pre>result = (a &lt; b) ? b : a;   <span class="c">/* condition ? if-true : if-false */</span></pre>
+<p>Use it for choosing a value, as here. Do not use it for choosing an <em>action</em>, and never nest
+them — a chain of three is unreadable and an <code>if</code> ladder is free.</p>
+<p>Old game code usually wrapped this in a macro: <code>#define MAX(a,b) ((a) &gt; (b) ? (a) : (b))</code>,
+with every argument parenthesised because the macro is raw text substitution and unparenthesised arguments
+collide with surrounding operators.</p>`,
+
+"A leaf function has no frame":
+`<p>Expressions mix operators by precedence, not left to right: <code>a * 2 + b</code> multiplies first.
+When you want the other order you parenthesise, and when the order is already right you can parenthesise
+anyway for the reader — it costs nothing and generates nothing.</p>`,
+
+"Passing a call's result straight back":
+`<p>C needs to know a function's shape before you call it, which is what a <b>prototype</b> is:</p>
+<pre><span class="k">int</span> helper(<span class="k">void</span>);   <span class="c">/* declaration: exists somewhere, returns int, takes nothing */</span></pre>
+<p><code>void</code> in the parameter list means "genuinely no arguments". Leaving the parentheses empty
+means something subtly different in old C — "unspecified" — so write <code>void</code>.</p>
+<p>In a real project these declarations live in a header file that every <code>.c</code> includes.</p>`,
+
+"Arguments go in, result comes out":
+`<p>A call is an expression, so it can be used anywhere a value can: <code>helper(b) + 1</code>,
+<code>x = helper(b)</code>, <code>if (helper(b) &gt; 0)</code>. It evaluates to whatever the function
+returned.</p>
+<p>Arguments are evaluated before the call, and C does not define what order multiple arguments are
+evaluated in — so never write <code>f(i++, i)</code>. In matching work you will sometimes see the compiler
+evaluate arguments in an order you did not expect, and that is allowed.</p>`,
+
+"Keeping a value alive across a call":
+`<p>Nothing in the C says "save this register" — you write the expression and the compiler works out what
+must survive. That means the prologue is downstream of your code's shape: if your version saves a different
+number of registers than the original, the difference is in how the values flow, not in anything you can
+fix directly.</p>`,
+
+"Swapping arguments on the way in":
+`<p>Argument order is positional and unchecked in spirit — a C compiler of this era will happily let a
+wrong-but-same-type argument through. When two parameters have the same type, the assembly is your only
+evidence for which is which, so read the argument registers at the call rather than guessing from the
+names.</p>`,
+
+"A function that returns nothing":
+`<p><code>void</code> as a return type means the function produces no value, so calling it is a statement
+rather than an expression. You cannot write <code>x = init();</code>.</p>
+<p>Statements run in order, separated by semicolons. This is one of the few places where C gives you a
+guarantee about ordering — within an expression it does not.</p>`,
+
+"Summing an array":
+`<p>The three-part <code>for</code>: setup, test, step.</p>
+<pre><span class="k">int</span> i;
+<span class="k">for</span> (i = 0; i &lt; n; i++) {
+    sum += p[i];
+}</pre>
+<p>Setup runs once, the test runs before every pass, the step runs after every pass. <code>i++</code> adds
+one, and <code>sum += x</code> is shorthand for <code>sum = sum + x</code>.</p>
+<p>Declare your loop variable at the top of the function, not inside the <code>for</code>. Declaring inside
+is a later C standard than these compilers accept, and it will simply fail to build.</p>`,
+
+"Writing in a loop":
+`<p>Two ways to walk memory, both common:</p>
+<pre><span class="k">for</span> (i = 0; i &lt; n; i++)    p[i] = 0;    <span class="c">/* by index   */</span>
+<span class="k">while</span> (n--)                *p++ = 0;    <span class="c">/* by pointer */</span></pre>
+<p><code>*p++ = 0</code> stores through the pointer and then advances it, because <code>++</code> after the
+name yields the old value. Dense, idiomatic, and very common in code of this vintage — worth being able to
+read even if you prefer writing the indexed form.</p>`,
+
+"Copying between two arrays":
+`<p>C will not stop you copying overlapping regions, reading past the end, or passing the arguments in the
+wrong order. None of it is checked at compile time or at run time.</p>
+<p>The habit that saves you: whenever a function takes a pointer and a count, treat the count as part of the
+pointer's meaning and keep them together. Almost every memory bug in C is a pointer that outlived or
+outgrew its length.</p>`,
+
+"Reading a global":
+`<p>A <b>global</b> is declared outside any function and lives at a fixed address for the whole run.
+<code>extern</code> in front means "this exists, defined in another file" — that is what goes in a header,
+while exactly one <code>.c</code> file has the real definition.</p>
+<pre><span class="k">int</span> g_frame;          <span class="c">/* definition: one file only  */</span>
+<span class="k">extern int</span> g_frame;   <span class="c">/* declaration: every other   */</span></pre>`,
+
+"Writing a global":
+`<p><code>static</code> on a global means "visible only within this file". It changes nothing about the
+generated instructions for the access itself, but it does affect whether other files can reach the symbol —
+which matters when you are reassembling a project file by file.</p>`,
+
+"Updating a global in place":
+`<p><code>++</code> and <code>--</code> come in two flavours: <code>x++</code> yields the old value then
+increments, <code>++x</code> increments then yields the new one. Alone on a line they are identical. Inside
+a larger expression they are not, and the compiled code differs.</p>
+<p>Never use more than one on the same variable in a single expression — <code>a[i++] = i</code> is
+undefined behaviour, not a clever trick.</p>`,
+
+"Indexing a global array":
+`<p>An array declared <code>extern int g_table[];</code> has no size in that declaration, which is legal —
+the size lives with the definition. It also means <code>sizeof(g_table)</code> will not work here, and that
+nothing anywhere checks your index.</p>`,
+
+"Floats have their own registers":
+`<p><code>float</code> is 4 bytes, <code>double</code> is 8. On this hardware <code>float</code> is fast and
+<code>double</code> is emulated in software, so prefer <code>float</code> and write literals with an
+<code>f</code> suffix — <code>1.5f</code>, not <code>1.5</code>, because an unsuffixed literal is a
+<code>double</code> and will drag the whole expression into software emulation.</p>`,
+
+"Crossing between integer and float":
+`<p>Converting between int and float loses things in both directions: a cast to <code>int</code> truncates
+toward zero (<code>(int)-2.7</code> is −2, not −3), and a large <code>int</code> cast to
+<code>float</code> loses low bits, since a float only carries about 24 bits of precision.</p>
+<p>C also converts implicitly when you mix types in one expression, which is why <code>return a;</code> from
+a <code>float</code> function compiles the same as the explicit cast. Writing the cast anyway documents that
+you meant it.</p>`,
+
+"Comparing floats sets a flag":
+`<p>Never compare floats with <code>==</code>. Values that are mathematically equal often differ in their
+last bits after arithmetic, so equality tests fail unpredictably. Compare against a tolerance instead, or
+restructure to use <code>&lt;</code>.</p>`,
+
+"Choosing without branching":
+`<p>The condition in a ternary follows C's usual truth rule — zero false, anything else true — so
+<code>cond ? a : b</code> and <code>cond != 0 ? a : b</code> are the same test. Both branches must produce
+the same type; mixing an <code>int</code> and a <code>float</code> silently converts one of them.</p>`,
+
+"Bitfields in one instruction":
+`<p>C can declare packed fields directly inside a struct:</p>
+<pre><span class="k">struct</span> {
+    <span class="k">unsigned int</span> kind  : 4;   <span class="c">/* 4 bits  */</span>
+    <span class="k">unsigned int</span> level : 4;
+    <span class="k">unsigned int</span> hp    : 8;
+};</pre>
+<p>The compiler generates the shifting and masking for you. It is compact and readable, but the exact bit
+ordering is left to the compiler, so code that needs a specific layout — hardware registers, file formats —
+usually does the masking by hand instead.</p>`,
+
+"Sign-extending in one step":
+`<p>Casting to a narrower type keeps the low bytes and throws the rest away. Casting back out re-widens
+using that type's signedness, which is where the sign-extension comes from.</p>
+<pre>x = 0x1234;
+(<span class="k">signed char</span>)x   <span class="c">/* 0x34 = 52     */</span>
+x = 0x12F0;
+(<span class="k">signed char</span>)x   <span class="c">/* 0xF0 = -16    */</span></pre>
+<p>Round-tripping through a narrow type is a lossy operation dressed up as a pair of casts, so when you see
+one in assembly it was almost certainly deliberate.</p>`
+};
+
+/* ---------- glossary ---------- */
+const GLOSS = {
+"bit":"A single 0 or 1 — the smallest thing a computer stores. Everything else is a pile of these.",
+"byte":"Eight bits, holding a number from 0 to 255. Memory is measured in bytes, and every byte has its own address.",
+"halfword":"Two bytes, 16 bits. In C that is a <code>short</code>.",
+"word":"Four bytes, 32 bits. On this machine a register holds exactly one word, and so does an instruction. In C that is an <code>int</code>.",
+"hex":"Base-16 numbers, written with a <code>0x</code> prefix. Each hex digit is exactly four bits, so one byte is always two hex digits: <code>0xF3</code>, <code>0x00</code>. It is used because the digit boundaries line up with the bit boundaries, which decimal's don't.",
+"register":"One of 32 storage slots inside the CPU, each holding 32 bits. They are the only place arithmetic can happen — anything in memory must be loaded into one first.",
+"RAM":"The computer's main memory: a huge array of bytes outside the CPU. The PS1 has 2 MB of it. Slower to reach than a register, which is why values get loaded into registers to be worked on.",
+"address":"A byte's position in memory, written as a hex number like <code>0x80014000</code>. Just an index into the giant array that is RAM.",
+"pointer":"A variable holding an address instead of a value. In assembly a pointer is nothing more than an address sitting in a register.",
+"dereference":"Following a pointer: going to the address it holds and reading what is there. In C that is the <code>*</code> operator; in assembly it is a load instruction.",
+"offset":"The constant added to an address inside a load or store, written as <code>0x10($a0)</code>. It costs nothing extra, so compilers fold constant indexes and struct field positions into it.",
+"immediate":"A number baked directly into the instruction rather than read from a register. Instructions ending in <code>i</code> — <code>addiu</code>, <code>andi</code>, <code>slti</code> — take one, which means the source code had a literal number there.",
+"instruction":"One command to the CPU. On MIPS every instruction is exactly four bytes, and it <em>is</em> a 32-bit number — the text form like <code>addiu $v0, $a0, 5</code> is a human convention for that number.",
+"opcode":"The part of an instruction's bits that says which operation it is. The top six bits on MIPS.",
+"mnemonic":"The short text name of an instruction — <code>lw</code>, <code>addu</code>, <code>beqz</code>. Short for the operation it performs, e.g. <code>lw</code> is 'load word'.",
+"operand":"One of the things an instruction works on, usually a register or a constant. <code>addu $v0, $a0, $a1</code> has three operands.",
+"delay slot":"The instruction printed indented under a branch or jump. The CPU has already fetched it by the time it works out where the jump goes, so it runs whether or not the branch is taken. Read a jump and its delay slot as one unit.",
+"branch":"An instruction that jumps somewhere else if a condition holds — the machinery behind <code>if</code>, loops and early returns.",
+"label":"A name for an address in the code, like <code>.L_ok:</code>, used as a branch target. Invented by the disassembler; it has no existence in the actual bytes.",
+"assembly":"The human-readable form of machine code: one line per instruction. What you are reading in every lesson here.",
+"compiler":"The program that turns C source into machine instructions. For the PS1 that is GCC 2.7.2, and matching means finding C that makes it produce the exact instructions you were given.",
+"matching":"Writing C that compiles to byte-identical output — same instructions, same registers, same order. The pass/fail standard of this kind of decompilation.",
+"mask":"A constant used with AND or OR to keep, clear or set particular bits. <code>x &amp; 0xFF</code> masks off everything above the low byte.",
+"shift":"Sliding a value's bits sideways. Left by <em>n</em> multiplies by 2ⁿ, right divides by it. Costs one cycle, versus about twelve for a real multiply, which is why compilers reach for it constantly.",
+"signed":"A type that can hold negatives, because the top bit is treated as a sign. An <code>int</code> is signed by default.",
+"unsigned":"A type that cannot be negative — the top bit is just another value bit, so the range runs 0 upward instead of splitting around zero.",
+"unsigned byte":"A byte read as 0–255, with no negative interpretation. Loaded with <code>lbu</code>, and its C type is <code>unsigned char</code>.",
+"unsigned char":"C's one-byte unsigned type, holding 0–255. PS1 decomp projects usually typedef it to <code>u8</code>. It is what a <code>lbu</code> in the assembly is telling you about.",
+"signed char":"C's one-byte signed type, holding −128 to 127. Loaded with <code>lb</code>, which fills the upper bits with the byte's sign.",
+"char":"C's one-byte type. On this toolchain a plain <code>char</code> is signed, which is why decomp projects prefer explicit <code>u8</code> and <code>s8</code> names.",
+"short":"C's two-byte type, holding a halfword. Loaded with <code>lh</code> or <code>lhu</code>.",
+"sign-extend":"Filling the unused upper bits of a register with copies of the value's top bit, so a small negative number stays negative when widened. <code>0xF3</code> as a signed byte becomes <code>0xFFFFFFF3</code>, which is −13.",
+"zero-extend":"Filling the unused upper bits with zeros, so a small value widens without gaining a sign. <code>0xF3</code> becomes <code>0x000000F3</code>, which is 243.",
+"two's complement":"How negative numbers are stored: to write −n, take n in binary, flip every bit, add 1. It means subtraction can reuse the ordinary adder, so the hardware needs no separate subtract circuit.",
+"sign bit":"The topmost bit of a signed value. 1 means negative. Everything about signed versus unsigned comes down to whether that bit is treated as a value or as a sign.",
+"struct":"A bundle of variables laid out consecutively in memory. Reaching a field means going a fixed distance past the start, which is why struct access shows up as a load with an offset.",
+"field":"One named member of a struct. In the assembly its name is gone and only its offset survives.",
+"padding":"Unused bytes the compiler inserts between struct fields so each one lands at an address its size can reach. It is why field offsets are often not what you would get by adding up the sizes.",
+"alignment":"The rule that a value must sit at an address divisible by its own size — 4 for a word, 2 for a halfword. This machine enforces it in hardware: a misaligned load raises an exception instead of being fixed up.",
+"array":"A run of equally sized values laid out back to back. Indexing one means multiplying the index by the element size and adding it to the base address.",
+"element size":"How many bytes one array entry occupies. Recovering it from the shift or multiply in an indexing sequence gives you the <code>sizeof</code> of whatever the array holds.",
+"stack":"A region of memory a function uses as scratch space, tracked by the <code>$sp</code> register. It grows downward, so a function claims room by subtracting from <code>$sp</code>.",
+"prologue":"The first few instructions of a function: claim stack space and save the registers this function has promised not to damage.",
+"epilogue":"The last few instructions of a function: restore what the prologue saved, release the stack space, and return.",
+"argument":"A value passed into a function. The first four arrive in <code>$a0</code> through <code>$a3</code>, in order; any beyond that go on the stack.",
+"return value":"What a function hands back to its caller. Always whatever is in <code>$v0</code> when it returns.",
+"null":"A pointer value of 0, meaning 'points at nothing'. Checking for it before dereferencing is the most common branch in game code.",
+"cycle":"One tick of the CPU clock. The PS1's runs at about 33 million per second. Most instructions take one; a multiply takes roughly twelve and a divide about thirty-five, which is why compilers avoid them.",
+"pipeline":"The CPU's assembly line — several instructions in flight at once, each at a different stage. It is the reason the delay slot exists: the next instruction is already in the pipe when a branch resolves.",
+"exception":"A fault that yanks the CPU out of your code — a misaligned access, a divide-by-zero trap. On a retail PS1 an unhandled one is a hang or a black screen.",
+"quotient":"The result of a division, ignoring the remainder. On MIPS it lands in the <code>LO</code> register and is fetched with <code>mflo</code>.",
+"remainder":"What is left over from a division. It lands in <code>HI</code> and is fetched with <code>mfhi</code> — which is what C's <code>%</code> compiles to.",
+"fixed point":"Storing fractional numbers as plain integers with an imagined binary point. The PS1 has no floating-point unit, so all its positions, angles and scales work this way — typically 4096 meaning 1.0.",
+"GTE":"The Geometry Transformation Engine, a coprocessor inside the PS1 that does 3D maths in fixed point. Its operations are single instructions, so a function doing heavy 3D work can contain almost no arithmetic.",
+"flag":"A single bit used as a yes/no switch, usually packed with others into one word. Set with OR, cleared with AND, tested with AND.",
+"calling convention":"The agreed rules about which registers carry arguments, hold the return value, and must survive a call. The hardware does not enforce any of it; the compiler and libraries just agree. The PS1's is called o32."
+};
+
+const GKEYS = Object.keys(GLOSS).sort((a,b) => b.length - a.length);
+
+function esc(s){ return s.replace(/[.*+?^${}()|[\]\\]/g,"\\$&"); }
+
+function glossify(root){
+  const used = {};
+  const nodes = [];
+  const walk = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  let n; while((n = walk.nextNode())) nodes.push(n);
+  let placed = 0;
+  while(nodes.length && placed < 12){
+    const node = nodes.shift();
+    if(!node.parentNode) continue;
+    if(node.parentNode.closest("pre, a, .gloss")) continue;
+    let best = null;
+    for(const key of GKEYS){
+      if(used[key]) continue;
+      const m = new RegExp("\\b" + esc(key) + "(s|es)?\\b", "i").exec(node.nodeValue);
+      if(m && (!best || m.index < best.m.index)) best = {key, m};
+    }
+    if(!best) continue;
+    const {key, m} = best;
+    const after = node.splitText(m.index);
+    after.nodeValue = after.nodeValue.slice(m[0].length);
+    const b = document.createElement("button");
+    b.className = "gloss"; b.type = "button";
+    b.textContent = m[0]; b.dataset.k = key;
+    after.parentNode.insertBefore(b, after);
+    used[key] = true; placed++;
+    nodes.unshift(after);
+  }
+  [...root.querySelectorAll(".gloss")].forEach(el => {
+    el.onclick = e => { e.stopPropagation(); showGloss(el); };
+    el.onmouseenter = () => { if(matchMedia("(hover:hover)").matches) showGloss(el); };
+  });
+}
+
+let gcur = null;
+function showGloss(el){
+  if(gcur) gcur.classList.remove("on");
+  gcur = el; el.classList.add("on");
+  $("gterm").textContent = el.textContent;
+  $("gdef").innerHTML = GLOSS[el.dataset.k];
+  $("gpanel").classList.add("on");
+}
+function hideGloss(){
+  $("gpanel").classList.remove("on");
+  if(gcur){ gcur.classList.remove("on"); gcur = null; }
+}
+
+/* ---------- state ---------- */
+let cur = 0, solved = {}, seen = {}, ready = false, cOpen = true;
+const KEY = "ps1-decomp-progress-v1";
+
+const store = {
+  async get(k){
+    if(typeof window.storage !== "undefined" && window.storage) return await window.storage.get(k);
+    const v = localStorage.getItem(k);
+    return v === null ? null : {key:k, value:v};
+  },
+  async set(k,v){
+    if(typeof window.storage !== "undefined" && window.storage) return await window.storage.set(k,v);
+    localStorage.setItem(k,v); return {key:k, value:v};
+  }
+};
+
+async function load(){
+  try{
+    const r = await store.get(KEY);
+    if(r && r.value){ const d = JSON.parse(r.value); solved = d.solved||{}; seen = d.seen||{}; cur = d.cur||0;
+      if(typeof d.cOpen === "boolean") cOpen = d.cOpen; }
+  }catch(e){ /* first run, or storage unavailable */ }
+  ready = true; render();
+}
+async function save(){
+  if(!ready) return;
+  try{ await store.set(KEY, JSON.stringify({solved,seen,cur,cOpen})); }catch(e){}
+}
+
+/* ---------- answer checking ---------- */
+function norm(s){
+  s = String(s||"");
+  s = s.replace(/\/\*[\s\S]*?\*\//g,"").replace(/\/\/.*$/gm,"");
+  s = s.replace(/\s+/g," ").trim();
+  s = s.replace(/\s*([(){}\[\];,+\-*\/%&|^~!<>=?:])\s*/g,"$1");
+  if(s && !/[;}]$/.test(s)) s += ";";
+  return s;
+}
+function loose(s){ return norm(s).replace(/[()]/g,"").toLowerCase(); }
+const CKEY = new Set(["int","char","short","long","unsigned","signed","void","float","double",
+  "if","else","for","while","do","return","break","continue","switch","case","default","struct",
+  "typedef","static","const","sizeof","NULL"]);
+
+/* collapse locally invented names so a loop answer isn't rejected over calling it sum vs total */
+function anon(s, keep){
+  return s.replace(/[A-Za-z_][A-Za-z0-9_]*/g, w =>
+    (CKEY.has(w) || keep.indexOf(w) >= 0) ? w : "v");
+}
+function check(input, answers, keep){
+  const a = norm(input), b = loose(input);
+  if(!a || a===";") return false;
+  for(const ans of answers){ if(a===norm(ans) || b===loose(ans)) return true; }
+  if(keep){
+    const ai = anon(b, keep);
+    for(const ans of answers){ if(ai === anon(loose(ans), keep)) return true; }
+  }
+  return false;
+}
+
+/* ---------- rendering ---------- */
+const $ = id => document.getElementById(id);
+
+function asmHTML(rows){
+  let addr = 0, out = '<div class="listing"><table>';
+  for(const r of rows){
+    if(r[0]==="LABEL"){
+      out += `<tr><td class="addr"></td><td colspan="2" class="lbl">${r[1]}</td></tr>`;
+      continue;
+    }
+    const hex = "0x" + addr.toString(16).padStart(2,"0");
+    const ops = String(r[1]||"").replace(/(\.L_[A-Za-z0-9_]+)/g,'<span class="lbl">$1</span>');
+    out += `<tr class="${r[2]?"slot":""}"><td class="addr">${hex}</td>`+
+           `<td class="mn">${r[2]?" ":""}${r[0]}</td><td class="op">${ops}</td></tr>`;
+    addr += 4;
+  }
+  return out + "</table></div>";
+}
+
+function render(){
+  const l = L[cur];
+  seen[l.title] = true;
+
+  $("kicker").textContent = `Chapter ${l.ch+1} · ${CH[l.ch]}`;
+  $("title").textContent = l.title;
+  $("body").innerHTML = l.body;
+  glossify($("body"));
+  hideGloss();
+  $("brand").innerHTML = `<b>Decomp Trainer</b> · lesson ${cur+1} of ${L.length}`;
+  $("rail").style.width = (100*Object.keys(solved).length/L.filter(x=>x.kind==="ex").length) + "%";
+
+  const plat = l.plat || "R3000A (PS1) · GCC 2.7.2 &nbsp;-O2";
+  $("asmZone").innerHTML = l.asm ? asmHTML(l.asm) +
+    `<div class="caption">${plat} · addresses relative to the function start</div>` : "";
+
+  if(l.kind === "ex"){
+    const done = !!solved[l.title];
+    const cn = CNOTE[l.title] ? `<details class="cnote" id="cn" ${cOpen?"open":""}>
+        <summary>C side \u2014 the syntax you need</summary>
+        <div class="inner">${CNOTE[l.title]}</div></details>` : "";
+    $("work").innerHTML = cn + `
+      <div class="editor">
+        <div class="sig">${l.sig}<br>{</div>
+        <textarea id="ta" spellcheck="false" autocapitalize="off" autocorrect="off"
+          placeholder="write the body here"></textarea>
+        <div class="sig" style="padding:0 12px 10px">}</div>
+      </div>
+      <div class="row">
+        <button class="btn primary" id="go">Check</button>
+        <button class="btn ghost" id="hintBtn">Hint</button>
+        <button class="btn ghost" id="show">Show answer</button>
+      </div>
+      <div id="verdict"></div>`;
+    if($("cn")){
+      glossify($("cn").querySelector(".inner"));
+      $("cn").ontoggle = () => { cOpen = $("cn").open; save(); };
+    }
+    if(done){ $("ta").value = l.answers[0]; pass(true); }
+    $("go").onclick = () => {
+      const keep = l.loose ? (l.sig.match(/[A-Za-z_][A-Za-z0-9_]*/g) || []) : null;
+      if(check($("ta").value, l.answers, keep)){ solved[l.title]=true; save(); pass(false); }
+      else {
+        $("verdict").innerHTML = `<div class="verdict no">Not this one. Compare your expression against the
+          registers line by line — something in the order, the operator or the width is different.</div>`;
+        $("after").innerHTML = "";
+      }
+    };
+    $("hintBtn").onclick = () => {
+      $("verdict").innerHTML = `<div class="verdict hintbox">${l.hint}</div>`;
+    };
+    $("show").onclick = () => {
+      $("ta").value = l.answers[0];
+      $("verdict").innerHTML = `<div class="verdict hintbox">Answer filled in. Read it against the listing,
+        then move on — this one won't count as solved.</div>`;
+      $("after").innerHTML = `<div class="teach"><h3>Why it matters</h3>${l.teach}</div>`;
+      glossify($("after"));
+    };
+  } else {
+    $("work").innerHTML = "";
+    $("after").innerHTML = "";
+  }
+
+  if(l.kind !== "ex") $("after").innerHTML = "";
+
+  $("nav").innerHTML =
+    (cur>0 ? `<button class="btn" id="prev">Back</button>` : "") +
+    (cur<L.length-1 ? `<button class="btn primary" id="next">Next lesson</button>` : "");
+  if($("prev")) $("prev").onclick = () => { cur--; save(); render(); scrollTo(0,0); };
+  if($("next")) $("next").onclick = () => { cur++; save(); render(); scrollTo(0,0); };
+
+  buildIndex(); save();
+}
+
+function pass(quiet){
+  $("verdict").innerHTML = `<div class="verdict ok">${quiet?"Solved earlier.":"That matches."}</div>`;
+  $("after").innerHTML = `<div class="teach"><h3>Why it matters</h3>${L[cur].teach}</div>`;
+  glossify($("after"));
+  $("rail").style.width = (100*Object.keys(solved).length/L.filter(x=>x.kind==="ex").length) + "%";
+  buildIndex();
+}
+
+function buildIndex(){
+  const total = L.filter(x=>x.kind==="ex").length;
+  $("tally").textContent = `${Object.keys(solved).length} of ${total} functions matched`;
+  let out = "", ch = -1;
+  L.forEach((l,i) => {
+    if(l.ch !== ch){ ch = l.ch; out += `<div class="ch">Chapter ${ch+1} · ${CH[ch]}</div>`; }
+    const cls = solved[l.title] ? "done" : (seen[l.title] ? "seen" : "");
+    out += `<div class="item ${i===cur?"cur":""}" data-i="${i}">
+      <span class="dot ${l.kind==="ex"?cls:(seen[l.title]?"seen":"")}"></span>
+      <span>${l.title}${l.kind==="concept"?' <span style="color:var(--dimmer);font-size:12px">reading</span>':''}</span>
+    </div>`;
+  });
+  $("idx").innerHTML = out;
+  [...document.querySelectorAll(".item")].forEach(el => {
+    el.onclick = () => { cur = +el.dataset.i; closeIdx(); render(); scrollTo(0,0); };
+  });
+  $("resetWrap").innerHTML = `<button class="btn ghost" id="reset">Reset progress</button>`;
+  $("reset").onclick = async () => {
+    solved = {}; seen = {}; await save(); render();
+  };
+}
+
+function openIdx(){ $("drawer").classList.add("on"); $("scrim").classList.add("on"); }
+function closeIdx(){ $("drawer").classList.remove("on"); $("scrim").classList.remove("on"); }
+$("openIdx").onclick = openIdx;
+$("scrim").onclick = () => { closeIdx(); hideGloss(); };
+$("gclose").onclick = hideGloss;
+document.addEventListener("click", e => {
+  if(!e.target.closest(".gloss") && !e.target.closest(".gpanel")) hideGloss();
+});
+
+load();
+</script>
