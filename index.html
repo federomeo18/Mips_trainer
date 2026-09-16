@@ -90,6 +90,50 @@
   .teach{margin:18px 0 0;padding:16px 0 0;border-top:1px solid var(--line)}
   .teach h3{font-family:var(--sans);font-size:13px;color:var(--dim);margin:0 0 10px;font-weight:600}
 
+
+  /* full glossary list */
+  .gall{border-top:1px solid var(--line)}
+  .gall>summary{font-family:var(--sans);font-size:12px;color:var(--dimmer);padding:16px 18px;
+    cursor:pointer;list-style:none;font-weight:600}
+  .gall>summary::-webkit-details-marker{display:none}
+  .gall>summary::before{content:"\25B8  "}
+  .gall[open]>summary::before{content:"\25BE  "}
+  .gall .gitem{padding:7px 18px;font-family:var(--mono);font-size:13px;color:var(--ink);cursor:pointer}
+  .gall .gitem:active{background:var(--panel2)}
+  .gall .gitem span{font-family:var(--sans);font-size:11.5px;color:var(--dimmer);padding-left:8px}
+
+  /* workbench */
+  .wbhead{display:flex;gap:10px;align-items:center;margin:26px 0 14px;flex-wrap:wrap}
+  .wbhead input{
+    flex:1;min-width:160px;background:var(--panel);border:1px solid var(--line);border-radius:6px;
+    color:var(--ink);font-family:var(--mono);font-size:14px;padding:9px 10px;
+  }
+  .wbhead input:focus{outline:0;border-color:var(--teal)}
+  textarea.paste{
+    width:100%;min-height:150px;background:var(--panel);border:1px solid var(--line);border-radius:6px;
+    color:var(--ink);font-family:var(--mono);font-size:13px;line-height:1.6;padding:10px;resize:vertical;
+  }
+  textarea.paste:focus{outline:0;border-color:var(--teal)}
+  .note{font-family:var(--sans);font-size:12.5px;color:var(--dimmer);margin:8px 0 0;line-height:1.5}
+  .ann{border:1px solid var(--line);border-radius:4px;background:#12151B;margin:18px 0 0;overflow-x:auto}
+  .ann table{border-collapse:collapse;width:100%;font-size:13px}
+  .ann td{padding:5px 10px;vertical-align:top;white-space:pre}
+  .ann .ins{font-family:var(--mono);color:var(--ink);width:1%}
+  .ann .gl{font-family:var(--sans);font-size:12.5px;color:var(--dim);white-space:normal;line-height:1.45}
+  .ann tr.slot .ins{background:rgba(217,164,65,.07)}
+  .ann tr.lb .ins{color:var(--amber)}
+  .ann tr+tr{border-top:1px solid rgba(47,54,68,.55)}
+  .card{border:1px solid var(--line);border-left:3px solid var(--teal);border-radius:4px;
+    background:var(--panel);padding:14px;margin:18px 0 0}
+  .card h3{font-family:var(--sans);font-size:13px;color:var(--dim);margin:0 0 10px;font-weight:600}
+  .card ul{margin:0;padding-left:18px;font-size:15px}
+  .card li{margin-bottom:7px;line-height:1.45}
+  .card .jump{font-family:var(--sans);font-size:12px;color:var(--teal);background:none;border:0;
+    padding:0 0 0 6px;cursor:pointer;text-decoration:underline}
+  .saved{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0 0}
+  .saved button{font-family:var(--mono);font-size:12.5px;background:var(--panel2);border:1px solid var(--line);
+    color:var(--ink);border-radius:20px;padding:6px 12px;cursor:pointer}
+
   /* C notes */
   .cnote{
     margin:22px 0 0;background:var(--panel);border:1px solid var(--line);
@@ -155,12 +199,13 @@
 <header>
   <div class="bar">
     <div class="brand" id="brand"></div>
+    <button class="btn" id="modeBtn">Workbench</button>
     <button class="btn" id="openIdx">Lessons</button>
   </div>
   <div class="rail"><i id="rail" style="width:0"></i></div>
 </header>
 
-<div class="wrap">
+<div class="wrap" id="lessonView">
   <div class="kicker" id="kicker"></div>
   <h1 id="title"></h1>
   <div class="body" id="body"></div>
@@ -168,6 +213,26 @@
   <div id="work"></div>
   <div id="after"></div>
   <div class="row" id="nav"></div>
+</div>
+
+<div class="wrap" id="wbView" style="display:none">
+  <div class="kicker">Workbench</div>
+  <h1>Your own functions</h1>
+  <div class="body">
+    <p>Paste a function's disassembly from Ghidra, objdump or PPSSPP. Every line gets read back to you in
+    plain words, and the patterns from the lessons get flagged where they appear.</p>
+  </div>
+  <div class="wbhead">
+    <input id="wbName" placeholder="function name or address" spellcheck="false" autocapitalize="off">
+    <button class="btn primary" id="wbGo">Analyse</button>
+  </div>
+  <textarea class="paste" id="wbAsm" spellcheck="false" autocapitalize="off" autocorrect="off"
+    placeholder="0x0888a1b4  27bdffe8  addiu  sp,sp,-0x18&#10;0x0888a1b8  afbf0014  sw     ra,0x14(sp)&#10;..."></textarea>
+  <div class="note">Addresses and raw hex are optional — it reads them if they're there and ignores them if
+  they aren't.</div>
+  <div id="wbOut"></div>
+  <div id="wbWork"></div>
+  <div class="saved" id="wbSaved"></div>
 </div>
 
 <div class="gpanel" id="gpanel">
@@ -180,6 +245,10 @@
 <nav class="drawer" id="drawer">
   <h2 id="tally"></h2>
   <div id="idx"></div>
+  <details class="gall">
+    <summary>Glossary &mdash; all terms</summary>
+    <div id="gallList"></div>
+  </details>
   <div class="foot">
     Answers are checked against known-good shapes, not a real compiler. When you want a true
     byte-match verdict, take the same function to <a href="https://decomp.me">decomp.me</a> with the
@@ -191,6 +260,35 @@
 
 <script>
 /* ---------- lesson data ---------- */
+const CTX_A = `<pre class="pre" style="padding:10px 0 4px">/* context for decomp.me */
+typedef struct {
+    int   unk_0;    /* 0x00 */
+    short state;    /* 0x04 */
+} SaveCtx;
+
+extern SaveCtx *g_ctx;</pre>`;
+const CTX_B = `<pre class="pre" style="padding:10px 0 4px">/* context for decomp.me */
+typedef struct {
+    char           pad_0[0x40];
+    SubObj         sub;      /* 0x040 */
+    int            mode;     /* 0x050 */
+    unsigned short w0;       /* 0x054 */
+    unsigned short w1;       /* 0x056 */
+    char           pad_58[0x0f0];
+    unsigned short src1;     /* 0x148 */
+    unsigned short src0;     /* 0x14c */
+} Ctx;
+
+int func_00081718(SubObj *s, int flag);</pre>`;
+
+const CARD_DEF = `<pre class="pre" style="padding:10px 0 4px">typedef struct {
+    unsigned char  id;      /* 0x00 */
+    unsigned char  cost;    /* 0x01 */
+    unsigned short flags;   /* 0x02 */
+    int            atk;     /* 0x04 */
+    int            def;     /* 0x08 */
+} Card;                     /* 12 bytes */</pre>`;
+
 const CH = [
   "Reading the machine",
   "Multiply and divide",
@@ -201,7 +299,9 @@ const CH = [
   "Loops",
   "Globals and addresses",
   "The PSP: what changes",
-  "Working on a real game"
+  "Real compiler output",
+  "Working on a real game",
+  "Metal Gear Ac!d: mgp_stage"
 ];
 
 const L = [
@@ -498,6 +598,29 @@ one word, tile IDs with flags in the spare bits, coordinates as two 16-bit halve
 feeding an OR, you are looking at a packed field, and the shift amount tells you where the boundary is.</p>`},
 
 /* ============ chapter 3 ============ */
+{ch:2,kind:"ex",title:"Real code: FUN_08805638, setting high bits",plat:"Metal Gear Ac!d &middot; mgp_main &middot; GCC 3.3.3+allegrex -O2",loose:true,
+body:`<p>Straight from <code>program.prx</code>, the engine module. Everything in this lesson is real
+extracted code from here on.</p>
+<p><code>lui $v0, 0x6000</code> looks like the start of an address build, but nothing pairs it with a
+<code>%lo</code> — so it is building a plain <b>constant</b>: 0x6000 in the upper half of a register is
+<code>0x60000000</code>.</p>
+<p>That constant is ORed into the argument, in the call's delay slot, so the callee receives the modified
+value. The frame exists only because there is a call.</p>
+<pre class="pre" style="padding:10px 0 4px">int func_0887778c(int x);</pre>`,
+asm:[["lui","$v0, 0x6000"],["addiu","$sp, $sp, -0x10"],["sw","$ra, 0x0($sp)"],
+     ["jal","func_0887778c"],["or","$a0, $a0, $v0",1],["lw","$ra, 0x0($sp)"],
+     ["jr","$ra"],["addiu","$sp, $sp, 0x10",1]],
+sig:"int func_08805638(int x)",
+hint:"One statement. Write the constant in hex the way the lui builds it.",
+answers:["return func_0887778c(x|0x60000000);","return func_0887778c(0x60000000|x);"],
+teach:`<p>Two habits from this one. A <code>lui</code> with no matching <code>%lo</code> is a constant, not
+an address — check before assuming. And setting the top bits of a value before passing it on almost always
+means a <b>tag</b>: a handle with a type in its high bits, or an address with a flag attached. When you find
+the callee, the meaning of 0x60000000 usually becomes obvious, and then it deserves a
+<code>#define</code>.</p>
+<p>Note also that <code>$v0</code> is used as scratch here even though it is the return-value register.
+Nothing has been returned yet, so it is free.</p>`},
+
 {ch:3,kind:"ex",title:"Following a pointer",
 body:`<p>Arithmetic instructions cannot touch memory on this machine. Only loads and stores can, and all
 they do is move a value between RAM and a register.</p>
@@ -791,6 +914,42 @@ but never two calls, since it cannot know what they touch. Sequences of <code>ja
 one-for-one, which makes big glue functions surprisingly easy wins.</p>`},
 
 /* ============ chapter 6 — loops ============ */
+{ch:5,kind:"ex",title:"Real code: FUN_08804d1c, a thin wrapper",plat:"Metal Gear Ac!d &middot; mgp_main &middot; GCC 3.3.3+allegrex -O2",loose:true,
+body:`<p>The smallest useful shape in any real binary, and <code>program.prx</code> is full of them: claim a
+frame, save <code>$ra</code>, call one thing, restore, return. Nothing else happens.</p>
+<p>The delay slot is a <code>nop</code>, so no arguments are set up — the callee takes none.</p>
+<pre class="pre" style="padding:10px 0 4px">void func_08804cec(void);</pre>`,
+asm:[["addiu","$sp, $sp, -0x10"],["sw","$ra, 0x0($sp)"],["jal","func_08804cec"],["nop","",1],
+     ["lw","$ra, 0x0($sp)"],["jr","$ra"],["addiu","$sp, $sp, 0x10",1]],
+sig:"void func_08804d1c(void)",hint:"One call, nothing else.",
+answers:["func_08804cec();"],
+teach:`<p>Worth knowing that the identical shape appears again a few kilobytes later at
+<code>FUN_08806fd0</code>, wrapping a different callee. <b>Repeated shapes are free progress</b>: once you
+have matched one, every other instance is the same C with one name changed. Early in a project, sweeping up
+all the wrappers is a fast way to build momentum and confidence in your toolchain.</p>
+<p>Why would code be written like this at all? Usually a public function delegating to a private one, or a
+layer that had extra work in a debug build and was left behind when it was stripped out.</p>`},
+
+{ch:5,kind:"ex",title:"Real code: FUN_088047c8, forwarding arguments",plat:"Metal Gear Ac!d &middot; mgp_main &middot; GCC 3.3.3+allegrex -O2",loose:true,
+body:`<p>Another wrapper, but this one adds an argument. <code>$a0</code> and <code>$a1</code> are never
+touched, so they arrive at the callee exactly as this function received them. The delay slot sets
+<code>$a2</code> to zero.</p>
+<p>And after the call, <code>$v0</code> is left alone — so whatever the callee returned becomes this
+function's return value too.</p>
+<pre class="pre" style="padding:10px 0 4px">int func_08926760(int a, int b, int flags);</pre>`,
+asm:[["addiu","$sp, $sp, -0x10"],["sw","$ra, 0x0($sp)"],["jal","func_08926760"],["li","$a2, 0",1],
+     ["lw","$ra, 0x0($sp)"],["jr","$ra"],["addiu","$sp, $sp, 0x10",1]],
+sig:"int func_088047c8(int a, int b)",
+hint:"Pass both arguments through and supply the third.",
+answers:["return func_08926760(a,b,0);"],
+teach:`<p>This is the classic default-argument wrapper: a two-argument version of a three-argument function,
+with the third fixed. C of this era had no default parameters, so you wrote a second function instead — and
+finding several wrappers around one callee tells you the callee's last argument is an options or mode
+flag.</p>
+<p>The giveaway that arguments pass through untouched is the <em>absence</em> of instructions. Nothing
+writes <code>$a0</code> or <code>$a1</code>, so they still hold what the caller put there. Reading what
+isn't in a listing is as important as reading what is.</p>`},
+
 {ch:6,kind:"concept",title:"Every loop is the same skeleton",
 body:`<p>GCC compiles <code>for</code>, <code>while</code> and <code>do…while</code> into one shape, so the
 keyword the original programmer used is usually unrecoverable and any of them can match.</p>
@@ -922,6 +1081,23 @@ wanted the <em>address</em> rather than the contents — an array base, a struct
 passed to something. When the <code>%lo</code> is inside a load or store instead, it wanted the value.</p>`},
 
 /* ============ chapter 8 — the PSP ============ */
+{ch:7,kind:"ex",title:"Real code: FUN_08807a60, clearing a global",plat:"Metal Gear Ac!d &middot; mgp_main &middot; GCC 3.3.3+allegrex -O2",loose:true,
+body:`<p>Three instructions, no frame, no branch — a leaf function doing exactly one thing.</p>
+<p><code>lui $v0, 0x894</code> puts 0x894 in the upper half, and the store's offset supplies
+<code>0x65cc</code>, so the address is <code>0x089465cc</code>. <code>$zero</code> is the value being
+written, which means the constant in the C is 0.</p>
+<p>The store sits in the return's delay slot, so it happens as the function leaves.</p>
+<pre class="pre" style="padding:10px 0 4px">extern int g_flag;   /* 0x089465cc */</pre>`,
+asm:[["lui","$v0, 0x894"],["jr","$ra"],["sw","$zero, 0x65cc($v0)",1]],
+sig:"void func_08807a60(void)",hint:"One assignment.",
+answers:["g_flag=0;"],
+teach:`<p>In your own scratch this becomes <code>lui $v0, %hi(g_flag)</code> and
+<code>sw $zero, %lo(g_flag)($v0)</code> — you invent the symbol, the assembler splits the address.</p>
+<p>The useful next move is in Ghidra: go to <code>0x089465cc</code> and list every reference to it. A
+global with one writer and many readers is a state flag; one with many writers is usually a counter or a
+cache. Either way, the set of functions touching it is a map of one subsystem, and naming it well pays off
+across all of them.</p>`},
+
 {ch:8,kind:"concept",title:"Same language, newer dialect",
 body:`<p>Everything up to this point transfers to the PSP unchanged. Its CPU — Sony's <b>Allegrex</b> — is
 still MIPS, still 32-bit, still little-endian, still o32, still has delay slots, still uses
@@ -1041,7 +1217,132 @@ find C that produces it.</li>
 only if the particular functions you care about turn out to need it.</p>`},
 
 /* ============ chapter 9 — a real game ============ */
-{ch:9,kind:"concept",title:"Choosing a first target",
+{ch:9,kind:"concept",title:"Everything from here is a compiler's work",
+body:`<p>Every listing up to this point was written by me to demonstrate one idea at a time. From here on
+they are not: each one came out of a real C compiler at <code>-O2</code>, unedited, from C I wrote once and
+never touched again.</p>
+<p>The difference shows immediately. Real output reorders instructions to fill delay slots, keeps values in
+whichever register was free, folds several source lines together, and reaches for tricks that look nothing
+like the C. A function you would expect to be four instructions comes out as six with no branches at all.</p>
+<p>All the exercises share one structure — a card in a card game — because that is the shape of thing you
+will spend a lot of time on in a game like this. Note its size: 12 bytes, because the fields align and the
+struct as a whole rounds up.</p>
+`+CARD_DEF},
+
+{ch:9,kind:"ex",title:"Two fields, one sum",plat:"mipsel gcc -O2 -march=mips32r2 · genuine compiler output",
+body:`<p>Start gently. Two loads at fixed offsets and an add, with the add moved into the return's delay
+slot because there was nothing else to put there.</p>
+<p>Read the offsets against the struct.</p>
+`+CARD_DEF,
+sig:"int card_power(Card *c)",hint:"Offsets 4 and 8.",
+answers:["return c->atk+c->def;","return c->def+c->atk;","return (*c).atk+(*c).def;"],
+teach:`<p>Notice the compiler loaded into <code>$v1</code> first and <code>$v0</code> second, then added them
+in that order. There is no meaning in the choice — it is the register allocator. Wasting time trying to make
+your C "produce <code>$v1</code> first" is a beginner trap; you write the expression and the allocation
+follows.</p>`,
+asm:[["lw", "$v1, 4($a0)"], ["lw", "$v0, 8($a0)"], ["jr", "$ra"], ["addu", "$v0, $v1, $v0", 1]]},
+
+{ch:9,kind:"ex",title:"A clamp with no branches",plat:"mipsel gcc -O2 -march=mips32r2 · genuine compiler output",
+body:`<p>This one is startling the first time. There is no branch anywhere, yet the C has two
+<code>if</code>s.</p>
+<p>Work it through: load 999 as the default, test whether the input is below 1000, and conditionally move
+the input over the 999 if it is. Then test whether <em>that</em> result is negative and conditionally move
+zero over it. Two conditional moves standing in for two branches.</p>`,
+sig:"int clamp_hp(int hp)",
+hint:"Two guards and a return. The bounds in the C are 0 and 999.",
+answers:["if(hp<0)return 0;if(hp>999)return 999;return hp;",
+         "if(hp<0)return 0;else if(hp>999)return 999;else return hp;",
+         "if(hp<0)hp=0;if(hp>999)hp=999;return hp;",
+         "if(hp>999)return 999;if(hp<0)return 0;return hp;"],
+teach:`<p>Two things to take away. <code>slt $v1, $a0, 1000</code> is testing <code>hp &gt; 999</code> —
+the compiler flipped it into a less-than against the next constant up, exactly as chapter 5 warned. And the
+order in the assembly is the reverse of the order in the C, because each conditional move overwrites the
+previous result. Branchless clamps are everywhere in game code.</p>`,
+asm:[["li", "$v0, 999"], ["slt", "$v1, $a0, 1000"], ["movn", "$v0, $a0, $v1"], ["slt", "$v1, $v0, 0"], ["jr", "$ra"], ["movn", "$v0, $zero, $v1", 1]]},
+
+{ch:9,kind:"ex",title:"An address, not a value",plat:"mipsel gcc -O2 -march=mips32r2 · genuine compiler output",
+body:`<p>No load at the end, so nothing is being read from memory — the function returns the computed
+address itself.</p>
+<p>The three instructions before it build the multiplier: shift left 1 is ×2, adding the original makes ×3,
+shift left 2 makes ×12. That is the struct's size.</p>
+`+CARD_DEF,
+sig:"Card *card_at(Card *deck, int i)",hint:"Take the address of an array element.",
+answers:["return &deck[i];","return deck+i;","return &(deck[i]);"],
+teach:`<p>This is the payoff from the shift-and-add lesson. A stride of 12 tells you
+<code>sizeof(Card)</code> without your having seen a single field, and once you know a struct's size you
+can tell arrays of it apart from arrays of anything else. Recovering strides is often how a struct's
+existence gets discovered in the first place.</p>`,
+asm:[["sll", "$v1, $a1, 1"], ["addu", "$v1, $v1, $a1"], ["sll", "$v1, $v1, 2"], ["jr", "$ra"], ["addu", "$v0, $a0, $v1", 1]]},
+
+{ch:9,kind:"ex",title:"A loop that never counts",plat:"mipsel gcc -O2 -march=mips32r2 · genuine compiler output",loose:true,
+body:`<p>A real loop, and it does something the hand-written examples did not: there is no counter left at
+all. The compiler multiplied the count by 12, added it to the base to get an <b>end pointer</b>, and the
+loop runs until the walking pointer reaches it.</p>
+<p>Also note <code>lbu</code> at offset 1 — the one-byte unsigned field — and the guard at the top that
+skips everything and returns zero when the count is not positive.</p>
+`+CARD_DEF,
+sig:"int hand_total(Card *hand, int n)",
+hint:"Add up one field across n cards. Write it as an ordinary counted loop; the pointer trick is the compiler's doing.",
+answers:["int t=0;int i;for(i=0;i<n;i++)t+=hand[i].cost;return t;",
+         "int t=0;int i;for(i=0;i<n;i++){t+=hand[i].cost;}return t;",
+         "int i;int t=0;for(i=0;i<n;i++)t+=hand[i].cost;return t;",
+         "int t=0;while(n--){t+=hand->cost;hand++;}return t;"],
+teach:`<p>The lesson here is that <b>you should not try to write C that produces the end pointer</b>. Write
+the obvious indexed loop; the compiler invents the pointer arithmetic. People new to matching often try to
+mirror the assembly's cleverness in their source and end up further from a match, not closer.</p>`,
+asm:[["blez", "$a1, .L8"], ["nop", "", 1], ["sll", "$v0, $a1, 1"], ["addu", "$a1, $v0, $a1"], ["move", "$v0, $zero"], ["sll", "$a1, $a1, 2"], ["addu", "$a1, $a0, $a1"], ["LABEL", ".L7:"], ["lbu", "$v1, 1($a0)"], ["addiu", "$a0, $a0, 12"], ["bne", "$a0, $a1, .L7"], ["addu", "$v0, $v0, $v1", 1], ["jr", "$ra"], ["nop", "", 1], ["LABEL", ".L8:"], ["jr", "$ra"], ["move", "$v0, $zero", 1]]},
+
+{ch:9,kind:"ex",title:"A comparison hiding behind an xor",plat:"mipsel gcc -O2 -march=mips32r2 · genuine compiler output",
+body:`<p>The last instruction is the interesting one. <code>xori $v0, $v0, 0x1</code> flips the low bit,
+which turns 1 into 0 and 0 into 1 — it is inverting a true/false value.</p>
+<p>So: read a global, read the one-byte field, do a less-than the <em>wrong way round</em>, then invert it.
+Inverting "greater than" gives you "less than or equal".</p>
+`+CARD_DEF,
+sig:"int is_playable(Card *c)",
+hint:"The global is called g_energy. The comparison is not strict.",
+answers:["return c->cost<=g_energy;","return g_energy>=c->cost;"],
+teach:`<p>MIPS has only less-than, so the other three comparisons are built from it: swap the operands for
+greater-than, and invert the result for the "or equal" versions. <code>xori 1</code> on a comparison result
+is the inversion, and spotting it saves you from writing <code>&lt;</code> where the source said
+<code>&lt;=</code>.</p>`,
+asm:[["lui", "$v0, %hi(g_energy)"], ["lw", "$v1, %lo(g_energy)($v0)"], ["lbu", "$v0, 1($a0)"], ["slt", "$v0, $v1, $v0"], ["jr", "$ra"], ["xori", "$v0, $v0, 0x1", 1]]},
+
+{ch:9,kind:"ex",title:"A conditional inside a loop",plat:"mipsel gcc -O2 -march=mips32r2 · genuine compiler output",loose:true,
+body:`<p>The same end-pointer loop, now with a test inside it. <code>lhu</code> at offset 2 reads the
+two-byte field, it gets ANDed with the third argument, and when the result is zero the increment is
+skipped by branching over it.</p>
+<p>Look at where the pointer advance sits: in the delay slot of the branch that skips the increment, so it
+happens on both paths.</p>
+`+CARD_DEF,
+sig:"int count_flag(Card *hand, int n, int mask)",
+hint:"Count how many cards have any of the mask bits set.",
+answers:["int c=0;int i;for(i=0;i<n;i++)if(hand[i].flags&mask)c++;return c;",
+         "int c=0;int i;for(i=0;i<n;i++){if(hand[i].flags&mask)c++;}return c;",
+         "int i;int c=0;for(i=0;i<n;i++)if(hand[i].flags&mask)c++;return c;",
+         "int c=0;int i;for(i=0;i<n;i++){if((hand[i].flags&mask)!=0)c++;}return c;"],
+teach:`<p>Two loop exits, one label for the skip and one for the empty case, and a delay slot doing the
+pointer advance for both paths. This is roughly the density of a real game function — and it is still only
+six lines of C. The ratio is why reading assembly feels harder than it is.</p>`,
+asm:[["blez", "$a1, .L15"], ["nop", "", 1], ["sll", "$v0, $a1, 1"], ["addu", "$a1, $v0, $a1"], ["move", "$v0, $zero"], ["sll", "$a1, $a1, 2"], ["addu", "$a1, $a0, $a1"], ["LABEL", ".L14:"], ["lhu", "$v1, 2($a0)"], ["and", "$v1, $v1, $a2"], ["beq", "$v1, $zero, .L13"], ["addiu", "$a0, $a0, 12", 1], ["addiu", "$v0, $v0, 1"], ["LABEL", ".L13:"], ["bne", "$a1, $a0, .L14"], ["nop", "", 1], ["jr", "$ra"], ["nop", "", 1], ["LABEL", ".L15:"], ["jr", "$ra"], ["move", "$v0, $zero", 1]]},
+
+{ch:9,kind:"ex",title:"Read, modify, clamp, write",plat:"mipsel gcc -O2 -march=mips32r2 · genuine compiler output",
+body:`<p>Everything at once, in six instructions and no branches. Load the field, subtract, test for
+negative, conditionally replace with zero, store it back.</p>
+<p>The store is in the delay slot, which means the write happens as the function returns.</p>
+`+CARD_DEF,
+sig:"void damage(Card *c, int amount)",
+hint:"Two statements: subtract, then clamp at zero. Offset 8.",
+answers:["c->def-=amount;if(c->def<0)c->def=0;",
+         "c->def=c->def-amount;if(c->def<0)c->def=0;",
+         "c->def-=amount;if(c->def<0){c->def=0;}"],
+teach:`<p>Worth noticing what the compiler did <em>not</em> do: the C reads <code>c-&gt;def</code> three
+times and writes it twice, but the assembly has one load and one store. It kept the value in a register
+throughout. Never count memory accesses in your C and expect them to match the assembly one for one —
+only the observable result has to agree.</p>`,
+asm:[["lw", "$v0, 8($a0)"], ["subu", "$a1, $v0, $a1"], ["slt", "$v0, $a1, 0"], ["movn", "$a1, $zero, $v0"], ["jr", "$ra"], ["sw", "$a1, 8($a0)", 1]]}
+,
+
+{ch:10,kind:"concept",title:"Choosing a first target",
 body:`<p>A decomp project is not one problem, it is two: reading functions, which is what this trainer
 teaches, and running a project, which is everything else. The second one decides whether you finish.</p>
 <p>What makes a target tractable:</p>
@@ -1060,7 +1361,7 @@ a decade-long one with a team.</li>
 data tables, light on the rendering maths that gets ugly. What you cannot know from the outside is which
 compiler built it and whether anyone has done the groundwork. Check both before committing.</p>`},
 
-{ch:9,kind:"concept",title:"Getting to code you can read",
+{ch:10,kind:"concept",title:"Getting to code you can read",
 body:`<p>The path from a disc image to instructions on a screen, in order:</p>
 <ul>
 <li><b>Mount or extract the ISO.</b> UMD images are a standard filesystem; ordinary tools read them.</li>
@@ -1075,7 +1376,7 @@ module. This is where you explore, rename things and form a picture, not where y
 table, and whether the module imports are named. Sony's own library calls are usually identifiable by import
 name even in a stripped binary, and every one you identify is a function you never have to decompile.</p>`},
 
-{ch:9,kind:"concept",title:"Finding the compiler",
+{ch:10,kind:"concept",title:"Finding the compiler",
 body:`<p>Matching is meaningless until you know what built the game. PSP titles of that era were built with
 either a GCC-based toolchain from the official SDK or SN Systems' compiler, at various versions, with flags
 you also have to guess. The wrong compiler produces code that is close but never identical, and you will
@@ -1093,7 +1394,7 @@ distinguish toolchains.</li>
 <p>Once a handful of unrelated functions all match with the same settings, you have your compiler and the
 project can start.</p>`},
 
-{ch:9,kind:"concept",title:"The loop you will actually live in",
+{ch:10,kind:"concept",title:"The loop you will actually live in",
 body:`<p>Day to day, a decomp is one repeating cycle, and it is short:</p>
 <ul>
 <li>Pick a function. Early on, the shortest leaf you can find.</li>
@@ -1113,7 +1414,7 @@ and its scratch list is full of other people's attempts to read.</p>
 sources working before matching anything serious, keep a symbol list as you go, and commit small. The
 functions are the easy part.</p>`},
 
-{ch:9,kind:"concept",title:"Where this leaves you",
+{ch:10,kind:"concept",title:"Where this leaves you",
 body:`<p>You have the reading vocabulary: registers and the return value, immediates, the shift-and-add
 tricks that stand in for multiply and divide, masks and packed fields, the five load widths and what each
 says about a type, offsets as struct fields, scaled indexing, comparisons as values, branches and their
@@ -1125,6 +1426,99 @@ from doing it a few hundred times, which no amount of explanation substitutes fo
 decomp.me and fail at it for a while; the failure teaches faster than these exercises can. And go and read
 finished code in a public decomp project, matching the C against the assembly beside it, because seeing what
 a completed function looks like tells you what you are aiming at.</p>`}
+,
+
+/* ============ chapter 11 — the real thing ============ */
+{ch:11,kind:"concept",title:"Reading your own game",
+body:`<p>Everything from here is lifted from <b>Metal Gear Ac!d</b> itself — the savedata overlay,
+<code>mgp_stage</code>, loaded at <code>0x08804000</code>. Thirty-three functions, five Sony imports, no
+symbols. These are not teaching examples; nobody arranged them to be readable.</p>
+<p>Three things about real extracted code that the made-up exercises could not show you.</p>
+<p><b>Addresses are not filled in.</b> A PRX is relocatable, so an address build appears as
+<code>lui $v0, 0x0</code> with the real upper half supplied by the loader at runtime. Before you can match
+one, you replace both halves with <code>%hi(symbol)</code> and <code>%lo(symbol)</code> and invent the
+symbol name yourself.</p>
+<p><b>Call targets are raw numbers.</b> <code>jal 0x00081718</code> with no name — that is a call whose
+target lives outside this module, unresolved on disk. You give it a placeholder name and move on; working
+out what it is comes later.</p>
+<p><b>Nothing is named.</b> Every struct field is an offset and every global is an address. The names in
+these exercises are ones I invented from what the code does with them, which is exactly what you will be
+doing, and you should expect to rename them twice as you learn more.</p>`},
+
+{ch:11,kind:"ex",title:"FUN_08805334 — a redundant condition",plat:"Metal Gear Ac!d &middot; mgp_stage &middot; GCC 3.3.3+allegrex -O2 -G0",loose:true,
+body:`<p>The first function you looked at. Ten instructions, and the shape of the C is deducible from one
+oddity in it.</p>
+<p>The address build fetches a pointer from a global, then a signed halfword is read from offset 4 of
+whatever it points at. <code>xori</code> against 6 is an equality test — XOR is zero only when both sides
+match — and <code>sltu $v0, $zero, $v1</code> turns any nonzero value into exactly 1.</p>
+<p>Now the tell: if the field is zero the branch skips ahead with 1 already loaded. But zero is not six
+anyway, so that path computes nothing the other path would not have produced. <b>A compiler does not emit
+redundant work.</b> Something in the source forced it — and in C only one construct forces the left side of
+a test to be evaluated and branched on before the right side is touched.</p>
+`+CTX_A,
+sig:"int func_08805334(void)",
+hint:"Two conditions joined by the operator that short-circuits. The first one is redundant, and you should write it anyway.",
+answers:["short state=g_ctx->state;return state==0||state!=6;",
+         "return g_ctx->state==0||g_ctx->state!=6;",
+         "short s=g_ctx->state;return s==0||s!=6;",
+         "int state=g_ctx->state;return state==0||state!=6;"],
+teach:`<p>The redundancy is the evidence. <code>||</code> guarantees the left operand is evaluated first and
+the right skipped if it already decided the answer, so the compiler must emit a branch even when the logic
+makes it pointless. Someone wrote two conditions in 2004 without noticing one covered the other, and the
+machine code preserved their mistake.</p>
+<p>Also note <code>lh</code> rather than <code>lhu</code>: the field is a <b>signed</b> 16-bit value. If you
+declare it unsigned, the load instruction changes and the match breaks.</p>`,
+asm:[["lui", "$v0, %hi(g_ctx)"], ["lw", "$v0, %lo(g_ctx)($v0)"], ["li", "$a0, 1"], ["lh", "$v0, 4($v0)"], ["beq", "$v0, $zero, .L08805354"], ["xori", "$v1, $v0, 6", 1], ["sltu", "$v0, $zero, $v1"], ["move", "$a0, $v0"], ["LABEL", ".L08805354:"], ["jr", "$ra"], ["move", "$v0, $a0", 1]]},
+
+{ch:11,kind:"ex",title:"FUN_08806218 — copying fields before a call",plat:"Metal Gear Ac!d &middot; mgp_stage &middot; GCC 3.3.3+allegrex -O2 -G0",loose:true,
+body:`<p>A pointer comes in as the single argument. The function writes a constant into one field, copies
+two 16-bit values down from high offsets to low ones, then calls something with the address of a
+sub-object.</p>
+<p>Two details to read carefully. <code>move $v1, $a0</code> at the top saves the pointer, because
+<code>addiu $a0, $a0, 0x40</code> later destroys it to build an argument — so the stores through
+<code>$v1</code> and the loads through <code>$a0</code> are the same object. And the second
+<code>sh</code> sits in the call's delay slot, so it happens before control transfers.</p>
+<p><code>lhu</code> and <code>sh</code> at offsets 0x148, 0x14c, 0x54 and 0x56 mean unsigned 16-bit fields.
+The call takes <code>&amp;p-&gt;sub</code> and the constant 1.</p>
+`+CTX_B,
+sig:"int func_08806218(Ctx *p)",
+hint:"Four statements and a return. Write them in the order the stores happen.",
+answers:["p->mode=2;p->w0=p->src0;p->w1=p->src1;func_00081718(&p->sub,1);return 0;",
+         "p->mode=2;p->w0=p->src0;p->w1=p->src1;func_00081718(&(p->sub),1);return 0;"],
+teach:`<p>The register shuffle at the top is the whole reason this looks confusing: one pointer, two
+registers, because the argument register had to be repurposed. Track which register holds the object and
+the function becomes four plain assignments.</p>
+<p>Copying 0x14c into 0x54 and 0x148 into 0x56 also tells you something structural — a pair of values being
+staged from one part of the object into another right before a call. Cross-reference those offsets in other
+functions and you will usually find what the sub-object at 0x40 is.</p>`,
+asm:[["addiu", "$sp, $sp, -0x10"], ["sw", "$ra, 0x0($sp)"], ["move", "$v1, $a0"], ["li", "$v0, 2"], ["lhu", "$a1, 0x14c($a0)"], ["lhu", "$a2, 0x148($a0)"], ["sw", "$v0, 0x50($a0)"], ["addiu", "$a0, $a0, 0x40"], ["sh", "$a1, 0x54($v1)"], ["li", "$a1, 1"], ["jal", "func_00081718"], ["sh", "$a2, 0x56($v1)", 1], ["lw", "$ra, 0x0($sp)"], ["li", "$v0, 0"], ["jr", "$ra"], ["addiu", "$sp, $sp, 0x10", 1]]},
+
+{ch:11,kind:"concept",title:"FUN_0880570c — read this one with me",plat:"Metal Gear Ac!d &middot; mgp_stage &middot; GCC 3.3.3+allegrex -O2 -G0",
+body:`<p>Not an exercise. This is a real function of ordinary size, and the point is to show you what
+ordinary looks like once the toy examples stop.</p>
+<p><b>The prologue.</b> 16 bytes of frame, and <code>$ra</code>, <code>$s0</code>, <code>$s1</code> and
+<code>$s2</code> all saved — so it calls something, and three values must survive that call. Those three
+saves are your first structural clue before reading any logic.</p>
+<p><b><code>seb $a0, $a0</code>.</b> Sign-extend byte. The first argument is a one-byte signed value that
+arrived in a 32-bit register, so the C parameter is a <code>char</code> or <code>s8</code>. One instruction,
+and it has settled a parameter type.</p>
+<p><b>The shuffle.</b> <code>$a3</code>, <code>$a1</code> and <code>$a2</code> get parked in
+<code>$s2</code>, <code>$s1</code> and <code>$s0</code> — arguments two, three and four being moved
+somewhere they will survive the call. The last one happens in the call's delay slot.</p>
+<p><b>The branch on the result.</b> <code>beq $v0, $zero</code> after the <code>jal</code> splits the
+function in two, and <code>slt $v1, $zero, $s0</code> in the delay slot computes "is the count positive"
+for <em>both</em> halves to use. One comparison, two consumers — the scheduler being clever.</p>
+<p><b>Two loops, same skeleton.</b> Each decrements a counter, advances a pointer by 4, and branches back.
+The first calls something per iteration and stores what it returns; the second stores the same saved value
+every time. One returns 1, the other 0.</p>
+<p>So the shape is: check something about the first argument; if it holds, fill an array by calling a
+function per element and return 1; otherwise fill the same array with a constant and return 0. Roughly
+sixteen lines of C for thirty-four instructions.</p>
+<p>What you cannot do yet is name it, because both <code>jal</code> targets are unresolved addresses in
+another module. That is the normal state of early work: you can read the structure completely and still not
+know what the function is for. The names come later, from cross-references and from whoever calls it.</p>
+` ,
+asm:[["addiu", "$sp, $sp, -0x10"], ["seb", "$a0, $a0"], ["sw", "$s2, 0x8($sp)"], ["move", "$s2, $a3"], ["sw", "$s1, 0x4($sp)"], ["move", "$s1, $a1"], ["sw", "$s0, 0x0($sp)"], ["sw", "$ra, 0xc($sp)"], ["jal", "func_000750a8"], ["move", "$s0, $a2", 1], ["beq", "$v0, $zero, .L08805760"], ["slt", "$v1, $zero, $s0", 1], ["beq", "$v1, $zero, .L08805780"], ["li", "$v0, 1", 1], ["LABEL", ".L08805744:"], ["jal", "func_000753a8"], ["addiu", "$s0, $s0, -0x1", 1], ["sw", "$v0, 0x0($s1)"], ["bne", "$s0, $zero, .L08805744"], ["addiu", "$s1, $s1, 4", 1], ["j", ".L08805780"], ["li", "$v0, 1", 1], ["LABEL", ".L08805760:"], ["beq", "$v1, $zero, .L08805780"], ["li", "$v0, 0", 1], ["move", "$a1, $s1"], ["LABEL", ".L0880576c:"], ["addiu", "$s0, $s0, -0x1"], ["sw", "$s2, 0x0($a1)"], ["bne", "$s0, $zero, .L0880576c"], ["addiu", "$a1, $a1, 4", 1], ["li", "$v0, 0"], ["LABEL", ".L08805780:"], ["lw", "$ra, 0xc($sp)"], ["lw", "$s2, 0x8($sp)"], ["lw", "$s1, 0x4($sp)"], ["lw", "$s0, 0x0($sp)"], ["jr", "$ra"], ["addiu", "$sp, $sp, 0x10", 1]]}
 
 ];
 
@@ -1595,21 +1989,38 @@ const GLOSS = {
 
 const GKEYS = Object.keys(GLOSS).sort((a,b) => b.length - a.length);
 
+function esc0(x){ return x.replace(/[.*+?^${}()|[\]\\]/g,"\\$&"); }
+
+/* the lesson each term is first used in, so a term is explained once and never repeated */
+const FIRST = {};
+(function(){
+  const strip = h => String(h||"").replace(/<[^>]*>/g," ");
+  L.forEach((l,i) => {
+    const txt = strip(l.body) + " " + strip(l.teach) + " " + strip(CNOTE[l.title] || "");
+    for(const key of GKEYS){
+      if(FIRST[key] !== undefined) continue;
+      if(new RegExp("\\b" + esc0(key) + "(s|es)?\\b","i").test(txt)) FIRST[key] = i;
+    }
+  });
+})();
+
 function esc(s){ return s.replace(/[.*+?^${}()|[\]\\]/g,"\\$&"); }
 
+let usedNow = {};
 function glossify(root){
-  const used = {};
+  const used = usedNow;
   const nodes = [];
   const walk = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
   let n; while((n = walk.nextNode())) nodes.push(n);
   let placed = 0;
-  while(nodes.length && placed < 12){
+  while(nodes.length && placed < 20){
     const node = nodes.shift();
     if(!node.parentNode) continue;
     if(node.parentNode.closest("pre, a, .gloss")) continue;
     let best = null;
     for(const key of GKEYS){
       if(used[key]) continue;
+      if(FIRST[key] !== cur) continue;
       const m = new RegExp("\\b" + esc(key) + "(s|es)?\\b", "i").exec(node.nodeValue);
       if(m && (!best || m.index < best.m.index)) best = {key, m};
     }
@@ -1727,6 +2138,7 @@ function render(){
 
   $("kicker").textContent = `Chapter ${l.ch+1} · ${CH[l.ch]}`;
   $("title").textContent = l.title;
+  usedNow = {};
   $("body").innerHTML = l.body;
   glossify($("body"));
   hideGloss();
@@ -1825,9 +2237,27 @@ function buildIndex(){
   };
 }
 
+function buildGlossaryList(){
+  const el = $("gallList");
+  if(!el || el.dataset.done) return;
+  el.dataset.done = "1";
+  const keys = Object.keys(GLOSS).sort((a,b) => a.localeCompare(b));
+  el.innerHTML = keys.map(k =>
+    `<div class="gitem" data-k="${k}">${k}<span>ch ${FIRST[k] !== undefined ? (L[FIRST[k]].ch + 1) : "\u2014"}</span></div>`
+  ).join("");
+  [...el.querySelectorAll(".gitem")].forEach(it => {
+    it.onclick = e => {
+      e.stopPropagation();
+      $("gterm").textContent = it.dataset.k;
+      $("gdef").innerHTML = GLOSS[it.dataset.k];
+      $("gpanel").classList.add("on");
+    };
+  });
+}
+
 function openIdx(){ $("drawer").classList.add("on"); $("scrim").classList.add("on"); }
 function closeIdx(){ $("drawer").classList.remove("on"); $("scrim").classList.remove("on"); }
-$("openIdx").onclick = openIdx;
+$("openIdx").onclick = () => { buildGlossaryList(); openIdx(); };
 $("scrim").onclick = () => { closeIdx(); hideGloss(); };
 $("gclose").onclick = hideGloss;
 document.addEventListener("click", e => {
