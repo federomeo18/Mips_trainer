@@ -91,6 +91,11 @@
   .teach h3{font-family:var(--sans);font-size:13px;color:var(--dim);margin:0 0 10px;font-weight:600}
 
 
+  .sigctl{display:flex;align-items:center;gap:10px;padding:14px 18px;border-top:1px solid var(--line);
+    font-family:var(--sans);font-size:12.5px;color:var(--dimmer)}
+  .sigctl span{flex:1}
+  .sigctl .btn{font-size:12.5px;padding:6px 10px}
+
   /* full glossary list */
   .gall{border-top:1px solid var(--line)}
   .gall>summary{font-family:var(--sans);font-size:12px;color:var(--dimmer);padding:16px 18px;
@@ -245,6 +250,10 @@
 <nav class="drawer" id="drawer">
   <h2 id="tally"></h2>
   <div id="idx"></div>
+  <div class="sigctl">
+    <span>Function signature</span>
+    <button class="btn ghost" id="sigBtn"></button>
+  </div>
   <details class="gall">
     <summary>Glossary &mdash; all terms</summary>
     <div id="gallList"></div>
@@ -501,19 +510,50 @@ teach:`<p>The signature was handed to you here, but in real work you derive it t
 recovered — there is no other record of them.</p>`},
 
 {ch:1,kind:"ex",title:"A signed divide is not one shift",
-body:`<p>C requires division to round toward zero: <code>-7 / 4</code> must be <code>-1</code>. An arithmetic
-shift right rounds toward negative infinity instead, giving <code>-2</code>. So for signed values the
-compiler patches the number up first.</p>
-<p>Reading it: if the value is zero or positive, branch straight to the shift with the value unchanged.
-Otherwise add 3 first — that bias is what makes the rounding come out right. <code>sra</code> is the
-<b>arithmetic</b> shift right, which preserves the sign bit.</p>`,
+body:`<p>Two new things appear here, so take them one at a time before the arithmetic.</p>
+
+<p><b>A label is a name for a place in the code.</b> <code>.L_sh:</code> is not an instruction and does
+nothing — it is a bookmark marking a position, so that other instructions can say "continue from here". The
+name is invented by whoever wrote out the listing.</p>
+
+<p><b>A branch is a conditional jump.</b> <code>bgez $a0, .L_sh</code> means "<b>b</b>ranch if
+<b>g</b>reater than or <b>e</b>qual to <b>z</b>ero": if the value in <code>$a0</code> is 0 or positive, carry
+on from the label and skip whatever lies between. If it is negative, ignore the branch and run the next
+instruction normally. That is how an <code>if</code> is built.</p>
+
+<p>Remember the delay-slot rule from chapter 1: the indented instruction below a branch <b>runs either
+way</b>, taken or not. So <code>move $v0, $a0</code> always happens.</p>
+
+<p>Now trace the two paths:</p>
+<ul>
+<li><b>Positive input.</b> <code>move</code> copies it to <code>$v0</code>, the branch jumps to the label,
+and the shift runs on the unchanged value.</li>
+<li><b>Negative input.</b> <code>move</code> still copies it, but the branch does not fire, so
+<code>addiu $v0, $a0, 3</code> runs and overwrites <code>$v0</code> with the value plus 3. Then the shift
+runs on that.</li>
+</ul>
+
+<p><b>Why add 3 only when negative?</b> Because C insists division rounds toward zero:
+<code>-7 / 4</code> must be <code>-1</code>. A shift always rounds downward, toward negative infinity, so
+<code>-7</code> shifted right by 2 gives <code>-2</code> — right for a shift, wrong for C. Adding 3 first
+turns <code>-7</code> into <code>-4</code>, and <code>-4</code> shifted right by 2 is <code>-1</code>, which
+is the answer C wants. Positive numbers already round correctly, so they are left alone.</p>
+
+<p><code>sra</code> is the <b>arithmetic</b> shift right: it shifts down while preserving the sign, unlike
+the <code>srl</code> from the previous lesson which fed zeros in at the top and would have destroyed a
+negative value.</p>
+
+<p>So all five instructions together do one thing, and the C is one operator.</p>`,
 asm:[["bgez","$a0, .L_sh"],["move","$v0, $a0",1],["addiu","$v0, $a0, 3"],["LABEL",".L_sh:"],
      ["sra","$v0, $v0, 2"],["jr","$ra"],["nop","",1]],
-sig:"int f(int a)",hint:"Five instructions, one C operator. The bias is invisible in the source.",
+sig:"int f(int a)",hint:"Five instructions, one C operator. Work out the divisor from the shift amount: shifting right by 2 divides by 4.",
 answers:["return a/4;"],
-teach:`<p>Learn this as a single unit: <b>branch on sign, add (divisor − 1), arithmetic shift</b> is signed
-division by a power of two, every time. The bias is always one less than the divisor, so a bias of 7 means
-÷8. None of it appears in the C.</p>`},
+teach:`<p>Learn the whole thing as one unit: <b>branch on sign, add (divisor − 1), arithmetic shift</b> is
+signed division by a power of two, every time.</p>
+<p>The bias is always one less than the divisor, so it tells you which divisor was used without your having
+to work out the shift: a bias of 3 means ÷4, a bias of 7 means ÷8, a bias of 15 means ÷16.</p>
+<p>And none of it is in the source. The programmer typed <code>a / 4</code>; the branch, the label and the
+bias are all the compiler making C's rounding rule come true on hardware that rounds the other way.</p>`},
 
 {ch:1,kind:"ex",title:"Real division, and the trap",
 body:`<p>When the divisor is a variable there is no shortcut — <code>div</code> runs, putting the quotient
@@ -1445,6 +1485,54 @@ out what it is comes later.</p>
 these exercises are ones I invented from what the code does with them, which is exactly what you will be
 doing, and you should expect to rename them twice as you learn more.</p>`},
 
+{ch:11,kind:"concept",title:"Getting the assembly out of Ghidra",
+body:`<p>Copy and paste does not work, and it is worth knowing exactly why. Ghidra's listing is a
+<em>display</em>, with columns and markers that are not assembly syntax. Six things have to change.</p>
+
+<p><b>1. Drop the address and byte columns.</b> The leftmost columns are the address and the raw
+instruction bytes. Informative, not syntax.</p>
+
+<p><b>2. Registers need a <code>$</code>.</b> Ghidra prints <code>v0</code>; the assembler wants
+<code>$v0</code>. Applies inside parentheses too: <code>0x4(v0)</code> becomes
+<code>0x4($v0)</code>.</p>
+
+<p><b>3. The leading underscore is not syntax.</b> Ghidra marks a delay-slot instruction by prefixing it
+with <code>_</code>. Delete the underscore and indent the line instead — that is the convention every decomp
+tool displays, and the assembler ignores the whitespace either way.</p>
+
+<p><b>4. Labels must be defined, not just referenced.</b> A branch to <code>LAB_08805354</code> needs a line
+somewhere reading <code>.L08805354:</code> with the colon. Ghidra shows that label floating in the margin
+without one.</p>
+
+<p><b>5. Call targets need names.</b> <code>jal 0x0887778c</code> is an address the assembler cannot resolve
+into a symbol. Rename it <code>func_0887778c</code> and the scratch resolves it as an external.</p>
+
+<p><b>6. Address builds need <code>%hi</code> and <code>%lo</code>.</b> This is the one that has no
+mechanical answer. <code>lui $v0, 0x0</code> means the relocation was not applied on disk. You must invent a
+symbol name, declare it in the Context pane, and write <code>%hi(name)</code> and <code>%lo(name)</code>
+across the two instructions. Nothing can do this for you, because only you know what the global is.</p>
+
+<p>The same function before and after:</p>
+<pre class="pre" style="padding:10px 0 4px">08805344 03 00 40 10     beq        v0,zero,LAB_08805354
+08805348 06 00 43 38     _xori      v1,v0,0x6
+                         LAB_08805354
+0880534c 08 00 e0 03     jr         ra
+
+    beq   $v0, $zero, .L08805354
+     xori $v1, $v0, 6
+.L08805354:
+    jr    $ra</pre>
+
+<p>Two more traps once functions get bigger. <b>Switch statements</b> compile to a jump through a table
+(<code>jr $v0</code> with a data table elsewhere), and the table is not part of the function's instructions
+— you have to carry it over as data or the scratch will not assemble. And <b>make sure you copied the whole
+function</b>: if a branch target lands outside what you pasted, the label is undefined and you will get an
+assembler error rather than a mismatch.</p>
+
+<p>Doing this by hand for every function gets old immediately, which is why there is a converter script
+alongside this trainer. Paste a listing in, get scratch-ready assembly out, with the unrelocated
+<code>lui</code> lines flagged for you to fill in.</p>`},
+
 {ch:11,kind:"ex",title:"FUN_08805334 — a redundant condition",plat:"Metal Gear Ac!d &middot; mgp_stage &middot; GCC 3.3.3+allegrex -O2 -G0",loose:true,
 body:`<p>The first function you looked at. Ten instructions, and the shape of the C is deducible from one
 oddity in it.</p>
@@ -2055,7 +2143,7 @@ function hideGloss(){
 }
 
 /* ---------- state ---------- */
-let cur = 0, solved = {}, seen = {}, ready = false, cOpen = true;
+let cur = 0, solved = {}, seen = {}, ready = false, cOpen = true, sigMode = "auto";
 const KEY = "ps1-decomp-progress-v1";
 
 const store = {
@@ -2074,13 +2162,14 @@ async function load(){
   try{
     const r = await store.get(KEY);
     if(r && r.value){ const d = JSON.parse(r.value); solved = d.solved||{}; seen = d.seen||{}; cur = d.cur||0;
-      if(typeof d.cOpen === "boolean") cOpen = d.cOpen; }
+      if(typeof d.cOpen === "boolean") cOpen = d.cOpen;
+      if(d.sigMode) sigMode = d.sigMode; }
   }catch(e){ /* first run, or storage unavailable */ }
   ready = true; render();
 }
 async function save(){
   if(!ready) return;
-  try{ await store.set(KEY, JSON.stringify({solved,seen,cur,cOpen})); }catch(e){}
+  try{ await store.set(KEY, JSON.stringify({solved,seen,cur,cOpen,sigMode})); }catch(e){}
 }
 
 /* ---------- answer checking ---------- */
@@ -2114,6 +2203,15 @@ function check(input, answers, keep){
 }
 
 /* ---------- rendering ---------- */
+/* From chapter 4 on, the signature is withheld and the whole function is yours to write:
+   return type, parameter types and names included. That is where type recovery is actually tested. */
+function fullMode(l){
+  if(sigMode === "show") return false;
+  if(sigMode === "hide") return true;
+  return l.ch >= 3;
+}
+function expectedFull(l, ans){ return l.sig + "{" + ans + "}"; }
+
 const $ = id => document.getElementById(id);
 
 function asmHTML(rows){
@@ -2154,13 +2252,20 @@ function render(){
     const cn = CNOTE[l.title] ? `<details class="cnote" id="cn" ${cOpen?"open":""}>
         <summary>C side \u2014 the syntax you need</summary>
         <div class="inner">${CNOTE[l.title]}</div></details>` : "";
-    $("work").innerHTML = cn + `
-      <div class="editor">
-        <div class="sig">${l.sig}<br>{</div>
-        <textarea id="ta" spellcheck="false" autocapitalize="off" autocorrect="off"
-          placeholder="write the body here"></textarea>
-        <div class="sig" style="padding:0 12px 10px">}</div>
-      </div>
+    const full = fullMode(l);
+    const box = full
+      ? `<div class="editor">
+           <div class="sig" style="color:var(--dimmer)">/* write the whole function &mdash; signature, types and all */</div>
+           <textarea id="ta" spellcheck="false" autocapitalize="off" autocorrect="off"
+             placeholder="int f(int a)&#10;{&#10;    ...&#10;}"></textarea>
+         </div>`
+      : `<div class="editor">
+           <div class="sig">${l.sig}<br>{</div>
+           <textarea id="ta" spellcheck="false" autocapitalize="off" autocorrect="off"
+             placeholder="write the body here"></textarea>
+           <div class="sig" style="padding:0 12px 10px">}</div>
+         </div>`;
+    $("work").innerHTML = cn + box + `
       <div class="row">
         <button class="btn primary" id="go">Check</button>
         <button class="btn ghost" id="hintBtn">Hint</button>
@@ -2171,10 +2276,13 @@ function render(){
       glossify($("cn").querySelector(".inner"));
       $("cn").ontoggle = () => { cOpen = $("cn").open; save(); };
     }
-    if(done){ $("ta").value = l.answers[0]; pass(true); }
+    if(done){ $("ta").value = full ? expectedFull(l, l.answers[0]) : l.answers[0]; pass(true); }
     $("go").onclick = () => {
-      const keep = l.loose ? (l.sig.match(/[A-Za-z_][A-Za-z0-9_]*/g) || []) : null;
-      if(check($("ta").value, l.answers, keep)){ solved[l.title]=true; save(); pass(false); }
+      const full = fullMode(l);
+      /* names are the learner's to invent in full mode, so identifiers are compared loosely */
+      const keep = (l.loose || full) ? (l.sig.match(/[A-Za-z_][A-Za-z0-9_]*/g) || []) : null;
+      const want = full ? l.answers.map(a => expectedFull(l, a)) : l.answers;
+      if(check($("ta").value, want, full ? [] : keep)){ solved[l.title]=true; save(); pass(false); }
       else {
         $("verdict").innerHTML = `<div class="verdict no">Not this one. Compare your expression against the
           registers line by line — something in the order, the operator or the width is different.</div>`;
@@ -2182,10 +2290,13 @@ function render(){
       }
     };
     $("hintBtn").onclick = () => {
-      $("verdict").innerHTML = `<div class="verdict hintbox">${l.hint}</div>`;
+      const extra = fullMode(l)
+        ? ` <br><br>You are writing the signature too: work the return type out from whether $v0 is set, and
+            the parameter types from the load widths and which argument registers get read.` : "";
+      $("verdict").innerHTML = `<div class="verdict hintbox">${l.hint}${extra}</div>`;
     };
     $("show").onclick = () => {
-      $("ta").value = l.answers[0];
+      $("ta").value = fullMode(l) ? expectedFull(l, l.answers[0]) : l.answers[0];
       $("verdict").innerHTML = `<div class="verdict hintbox">Answer filled in. Read it against the listing,
         then move on — this one won't count as solved.</div>`;
       $("after").innerHTML = `<div class="teach"><h3>Why it matters</h3>${l.teach}</div>`;
@@ -2255,9 +2366,16 @@ function buildGlossaryList(){
   });
 }
 
+const SIGLABEL = {auto:"Auto (hidden from ch 4)", show:"Always shown", hide:"Always hidden"};
+function paintSigBtn(){ if($("sigBtn")) $("sigBtn").textContent = SIGLABEL[sigMode]; }
+
 function openIdx(){ $("drawer").classList.add("on"); $("scrim").classList.add("on"); }
 function closeIdx(){ $("drawer").classList.remove("on"); $("scrim").classList.remove("on"); }
-$("openIdx").onclick = () => { buildGlossaryList(); openIdx(); };
+$("openIdx").onclick = () => { buildGlossaryList(); paintSigBtn(); openIdx(); };
+$("sigBtn").onclick = () => {
+  sigMode = sigMode === "auto" ? "show" : sigMode === "show" ? "hide" : "auto";
+  paintSigBtn(); save(); render();
+};
 $("scrim").onclick = () => { closeIdx(); hideGloss(); };
 $("gclose").onclick = hideGloss;
 document.addEventListener("click", e => {
