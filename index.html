@@ -402,7 +402,8 @@ body:`<p><code>addiu</code> is "add immediate". <b>Immediate</b> means the numbe
 instruction itself rather than read from a register. The destination is written first, then the source,
 then the constant.</p>
 <p>So <code>addiu $v0, $a0, 5</code> reads: take <code>$a0</code>, add 5, put the result in
-<code>$v0</code>.</p>`,
+<code>$v0</code>.</p>
+<p>The third line is <code>nop</code> — "no operation", an instruction that deliberately does nothing. It is filling the delay slot after the return because the compiler found nothing useful to put there. Read it as empty space.</p>`,
 asm:[["addiu","$v0, $a0, 5"],["jr","$ra"],["nop","",1]],
 sig:"int f(int a)",hint:"Destination, source, constant — in that order.",
 answers:["return a+5;","return 5+a;"],
@@ -456,6 +457,48 @@ teach:`<p><code>$zero</code> earns its place many times over: it makes copy, neg
 needing five more opcodes. When you see <code>$zero</code>, ask what ordinary operation it is standing in for.</p>`},
 
 /* ============ chapter 1 ============ */
+{ch:1,kind:"concept",title:"How to read a block you don't understand",
+body:`<p>From here the listings stop mapping one-to-one onto C, and the instinct to translate line by line
+starts to fail. What replaces it is a method, and it is the same one every time.</p>
+
+<p><b>Stop reading instructions. Start computing outputs.</b> Feed the block a few numbers and write down
+what comes out the other end. Include a negative and a zero, because that is where behaviour usually
+diverges. Then look only at the inputs and the outputs, ignoring everything in between, and ask which single
+C operator produces that table.</p>
+
+<p>For a block that turns 8 into 2, 7 into 1, and −7 into −1, the answer is division by 4 — whatever the
+instructions did to get there.</p>
+
+<p><b>Then ask what the extra work was for.</b> Mentally delete the part you did not understand and
+recompute. If the answer changes, you have just learned what that part is <em>for</em>. If it does not
+change, the part is not there for the arithmetic at all, which is its own strong clue.</p>
+
+<p><b>A compiler only ever adds.</b> The source is always simpler than the assembly, never more complex. So
+any surplus instruction is one of three things, and none of them came from the programmer:</p>
+<ul>
+<li><b>A hardware gap.</b> The chip cannot do what C promises, so the compiler patches it — rounding fixes
+on signed division, shift-and-add chains instead of multiply, comparisons squashed to exactly 0 or 1.</li>
+<li><b>A language guarantee.</b> C demands a specific behaviour and the compiler must honour it, even when
+it looks pointless. The short-circuiting of <code>&amp;&amp;</code> and <code>||</code> is the one you will
+meet most.</li>
+<li><b>The scheduler.</b> Instructions moved to fill delay slots or keep the pipeline busy. No meaning at
+all — do not try to reproduce it in your C.</li>
+</ul>
+
+<p>So the three questions, in order:</p>
+<ul>
+<li>What does this block output for a handful of inputs?</li>
+<li>If I remove the confusing part, what changes?</li>
+<li>What is the shortest thing a person would have typed to get that?</li>
+</ul>
+
+<p>The second question is the one people skip, and it is the one that does the work. A block whose odd part
+changes nothing is not doing arithmetic — it is honouring a language rule, and that tells you which C
+construct was written.</p>
+
+<p>Aim at the third answer. Not a transcription that computes the right number, but the line someone
+actually wrote.</p>`},
+
 {ch:1,kind:"ex",title:"Multiplying by a power of two",
 body:`<p>Shifting a binary number one place left and filling a zero in at the right doubles it, exactly as sliding a
 decimal number left and filling a zero in multiplies by ten. Shift by <code>n</code> and you have multiplied
@@ -561,7 +604,8 @@ in <code>LO</code> and the remainder in <code>HI</code> at the same time. The <c
 its first operand is a syntax quirk and means nothing.</p>
 <p>The hardware does not fault on divide-by-zero, it produces garbage, so GCC bolts on its own check:
 skip past the trap if the divisor is nonzero, otherwise hit <code>break 0x7</code>, which is breakpoint
-code 7, "divide by zero".</p>`,
+code 7, "divide by zero".</p>
+<p><code>bnez</code> is "<b>b</b>ranch if <b>n</b>ot <b>e</b>qual to <b>z</b>ero": jump to the label when the register holds anything other than 0. Its opposite, <code>beqz</code>, jumps when it is 0.</p>`,
 asm:[["div","$zero, $a0, $a1"],["bnez","$a1, .L_ok"],["nop","",1],["break","0x7"],["LABEL",".L_ok:"],
      ["mflo","$v0"],["jr","$ra"],["nop","",1]],
 sig:"int f(int a, int b)",hint:"All six instructions collapse into one operator.",
@@ -583,22 +627,28 @@ If a function needs both, you will see one <code>div</code> followed by both mov
 /* ============ chapter 2 ============ */
 {ch:2,kind:"ex",title:"Keeping only some bits",
 body:`<p><code>and</code> compares two values bit by bit and keeps a bit only where both sides have it.
-Against a constant like <code>0xFF</code> — eight bits set — everything above the low byte is wiped out.
-That is a <b>mask</b>.</p>
+<code>0xFF</code> is eight 1s in a row — one byte's worth — so ANDing against it keeps the lowest byte of
+the value and wipes out everything above. A constant used this way is called a <b>mask</b>, and the C side
+note below explains the bit arithmetic and why the constant is written in hex.</p>
 <p><code>andi</code> is the immediate form, and its constant is <b>zero</b>-extended rather than
 sign-extended, which is the one place where <code>andi</code>, <code>ori</code> and <code>xori</code> differ
 from the arithmetic immediates.</p>`,
 asm:[["andi","$v0, $a0, 0xff"],["jr","$ra"],["nop","",1]],
 sig:"int f(int a)",hint:"Use the hex constant as written.",
 answers:["return a&0xff;","return a&255;","return a&0xFF;"],
-teach:`<p>A mask of <code>0xFF</code> is often a hint that a byte-sized value is being extracted from a
-packed word, and a mask that is one less than a power of two (<code>0xF</code>, <code>0x3F</code>,
-<code>0xFF</code>) is sometimes an unsigned modulo: <code>x % 64</code> compiles to
-<code>andi $v0, $a0, 0x3f</code>.</p>`},
+teach:`<p><b>Count the set bits and you have the field's width.</b> <code>0xFF</code> keeps 8 bits,
+<code>0x3F</code> keeps 6, <code>0x7</code> keeps 3. That number is worth recording — it is how wide the
+value being extracted actually is, which constrains what it can be. A 3-bit field holds 0 to 7, so it is
+almost certainly a small enumeration: a state, a direction, a card suit.</p>
+<p>One structural limit to know. The immediate in <code>andi</code> is 16 bits, so a mask above
+<code>0xFFFF</code> cannot fit in the instruction. When you see a mask built with <code>lui</code> and
+<code>ori</code> before the <code>and</code>, that is why — and it means the mask reaches into the upper
+half of the word, so the field lives high in a packed value rather than low.</p>`},
 
 {ch:2,kind:"ex",title:"Turning a bit on",
 body:`<p><code>or</code> keeps a bit if <b>either</b> side has it, so OR-ing against a constant with one bit
-set turns that bit on and leaves everything else alone. That is how flags get set.</p>`,
+set turns that bit on and leaves everything else alone. That is how flags get set.</p>
+<p><code>ori</code> is the immediate form of OR — the <code>i</code> suffix means the second operand is a constant baked into the instruction, the same pattern as <code>addiu</code> and <code>andi</code>.</p>`,
 asm:[["ori","$v0, $a0, 0x10"],["jr","$ra"],["nop","",1]],
 sig:"int f(int a)",hint:"Set the bit, don't touch the rest.",
 answers:["return a|0x10;","return a|16;"],
@@ -608,7 +658,8 @@ ones is a bit being cleared.</p>`},
 
 {ch:2,kind:"ex",title:"Flipping bits",
 body:`<p><code>xor</code> keeps a bit where exactly one side has it. XOR against a mask flips precisely
-those bits and leaves the others untouched, which makes it the standard way to toggle a flag.</p>`,
+those bits and leaves the others untouched, which makes it the standard way to toggle a flag.</p>
+<p>In C the operator is <code>^</code>. <code>x ^ mask</code> flips those bits, and <code>x ^= mask</code> does it in place.</p>`,
 asm:[["xori","$v0, $a0, 0x1"],["jr","$ra"],["nop","",1]],
 sig:"int f(int a)",hint:"One character operator.",
 answers:["return a^1;","return a^0x1;"],
@@ -646,7 +697,9 @@ extracted code from here on.</p>
 <code>0x60000000</code>.</p>
 <p>That constant is ORed into the argument, in the call's delay slot, so the callee receives the modified
 value. The frame exists only because there is a call.</p>
-<pre class="pre" style="padding:10px 0 4px">int func_0887778c(int x);</pre>`,
+<pre class="pre" style="padding:10px 0 4px">int func_0887778c(int x);</pre>
+<p>In C, OR is written <code>|</code>: <code>x | 0x60000000</code> sets those bits and leaves the rest alone.</p>
+<p>Three instructions here are the function's plumbing rather than its work. <code>addiu $sp, $sp, -0x10</code> claims 16 bytes of scratch space in memory; <code>sw $ra, 0x0($sp)</code> "<b>s</b>tores the <b>w</b>ord" in <code>$ra</code> into that space, because the call is about to overwrite the return address; and <code>jal</code>, "<b>j</b>ump <b>a</b>nd <b>l</b>ink", is how one function calls another. Chapter 6 covers all three properly — for now, read them as the frame around the one line that matters.</p>`,
 asm:[["lui","$v0, 0x6000"],["addiu","$sp, $sp, -0x10"],["sw","$ra, 0x0($sp)"],
      ["jal","func_0887778c"],["or","$a0, $a0, $v0",1],["lw","$ra, 0x0($sp)"],
      ["jr","$ra"],["addiu","$sp, $sp, 0x10",1]],
@@ -766,7 +819,8 @@ have holes, and forgetting them is why reconstructed offsets come out one or two
     /* 1 byte padding    */
     unsigned short timer;  /* 0x02 */
     int            score;  /* 0x04 */
-} Entry;</pre>`,
+} Entry;</pre>
+<p>In C you reach a field through a pointer with the arrow: <code>e-&gt;timer</code>.</p>`,
 asm:[["lhu","$v0, 0x2($a0)"],["jr","$ra"],["nop","",1]],
 sig:"int f(Entry *e)",hint:"Offset 0x02, loaded as an unsigned halfword.",
 answers:["return e->timer;","return (*e).timer;"],
@@ -775,6 +829,31 @@ the hardware refuses unaligned access outright — a misaligned <code>lw</code> 
 being fixed up. So the compiler inserts padding, and the struct's total size gets rounded up too.</p>`},
 
 /* ============ chapter 4 ============ */
+{ch:3,kind:"ex",title:"FUN_08806218 — copying fields before a call",plat:"Metal Gear Ac!d &middot; mgp_stage &middot; GCC 3.3.3+allegrex -O2 -G0",loose:true,
+body:`<p>A pointer comes in as the single argument. The function writes a constant into one field, copies
+two 16-bit values down from high offsets to low ones, then calls something with the address of a
+sub-object.</p>
+<p>This is real extracted code from <b>Metal Gear Ac!d</b> rather than an invented example, so it carries machinery from later chapters: the <code>addiu $sp</code> / <code>sw $ra</code> pair at the top is the function reserving scratch space and saving its return address before a call, and <code>jal</code> is that call. Chapter 6 covers all of it. Read past it to the loads and stores, which are the lesson.</p>
+<p>Two details to read carefully. <code>move $v1, $a0</code> at the top saves the pointer, because
+<code>addiu $a0, $a0, 0x40</code> later destroys it to build an argument — so the stores through
+<code>$v1</code> and the loads through <code>$a0</code> are the same object. And the second
+<code>sh</code> sits in the call's delay slot, so it happens before control transfers.</p>
+<p><code>lhu</code> and <code>sh</code> at offsets 0x148, 0x14c, 0x54 and 0x56 mean unsigned 16-bit fields.
+The call takes <code>&amp;p-&gt;sub</code> and the constant 1.</p>
+
+<p><code>li</code> is "load immediate": put a constant straight into a register. <code>li $v0, 2</code> is where the 2 in the C comes from, and <code>li $a1, 1</code> is the second argument being set up for the call.</p>`+CTX_B,
+sig:"int func_08806218(Ctx *p)",
+hint:"Four statements and a return. Write them in the order the stores happen.",
+answers:["p->mode=2;p->w0=p->src0;p->w1=p->src1;func_00081718(&p->sub,1);return 0;",
+         "p->mode=2;p->w0=p->src0;p->w1=p->src1;func_00081718(&(p->sub),1);return 0;"],
+teach:`<p>The register shuffle at the top is the whole reason this looks confusing: one pointer, two
+registers, because the argument register had to be repurposed. Track which register holds the object and
+the function becomes four plain assignments.</p>
+<p>Copying 0x14c into 0x54 and 0x148 into 0x56 also tells you something structural — a pair of values being
+staged from one part of the object into another right before a call. Cross-reference those offsets in other
+functions and you will usually find what the sub-object at 0x40 is.</p>`,
+asm:[["addiu", "$sp, $sp, -0x10"], ["sw", "$ra, 0x0($sp)"], ["move", "$v1, $a0"], ["li", "$v0, 2"], ["lhu", "$a1, 0x14c($a0)"], ["lhu", "$a2, 0x148($a0)"], ["sw", "$v0, 0x50($a0)"], ["addiu", "$a0, $a0, 0x40"], ["sh", "$a1, 0x54($v1)"], ["li", "$a1, 1"], ["jal", "func_00081718"], ["sh", "$a2, 0x56($v1)", 1], ["lw", "$ra, 0x0($sp)"], ["li", "$v0, 0"], ["jr", "$ra"], ["addiu", "$sp, $sp, 0x10", 1]]},
+
 {ch:4,kind:"ex",title:"Comparison is a value, not a flag",
 body:`<p>Many processors keep hidden status bits that a compare sets and a branch later reads. MIPS has
 nothing like that. A comparison is an ordinary instruction writing an ordinary register:
@@ -855,6 +934,34 @@ it, and never index an array with a value you have not bounded. C will let you d
 will not warn you.</p>`},
 
 /* ============ chapter 5 — functions and the stack ============ */
+{ch:4,kind:"ex",title:"FUN_08805334 — a redundant condition",plat:"Metal Gear Ac!d &middot; mgp_stage &middot; GCC 3.3.3+allegrex -O2 -G0",loose:true,
+body:`<p>The first function you looked at. Ten instructions, and the shape of the C is deducible from one
+oddity in it.</p>
+<p>One thing arrives early here: reaching a fixed address takes <b>two</b> instructions on this machine, because a 32-bit address will not fit inside one. <code>lui</code> supplies the upper half and the load's offset the lower, and <code>%hi</code> / <code>%lo</code> is how that is written. Chapter 8 explains it properly — for now read the first two lines as a single step: "fetch the pointer".</p>
+<p>That address build fetches a pointer from a global, then a signed halfword is read from offset 4 of
+whatever it points at. <code>xori</code> against 6 is an equality test — XOR is zero only when both sides
+match — and <code>sltu $v0, $zero, $v1</code> turns any nonzero value into exactly 1.</p>
+<p>Now the tell: if the field is zero the branch skips ahead with 1 already loaded. But zero is not six
+anyway, so that path computes nothing the other path would not have produced. <b>A compiler does not emit
+redundant work.</b> Something in the source forced it — and in C only one construct forces the left side of
+a test to be evaluated and branched on before the right side is touched.</p>
+
+<p>The C operators involved: <code>-&gt;</code> to read a field through a pointer, <code>==</code> for equality, <code>!=</code> for inequality, and <code>||</code> for or.</p>
+<p><code>beq $v0, $zero, .L08805354</code> is "<b>b</b>ranch if <b>eq</b>ual" — compare two registers and jump to the label when they match. Against <code>$zero</code> it means "jump if this value is zero", and <code>.L08805354</code> is just a name for a position further down.</p>`+CTX_A,
+sig:"int func_08805334(void)",
+hint:"Two conditions joined by the operator that short-circuits. The first one is redundant, and you should write it anyway.",
+answers:["short state=g_ctx->state;return state==0||state!=6;",
+         "return g_ctx->state==0||g_ctx->state!=6;",
+         "short s=g_ctx->state;return s==0||s!=6;",
+         "int state=g_ctx->state;return state==0||state!=6;"],
+teach:`<p>The redundancy is the evidence. <code>||</code> guarantees the left operand is evaluated first and
+the right skipped if it already decided the answer, so the compiler must emit a branch even when the logic
+makes it pointless. Someone wrote two conditions in 2004 without noticing one covered the other, and the
+machine code preserved their mistake.</p>
+<p>Also note <code>lh</code> rather than <code>lhu</code>: the field is a <b>signed</b> 16-bit value. If you
+declare it unsigned, the load instruction changes and the match breaks.</p>`,
+asm:[["lui", "$v0, %hi(g_ctx)"], ["lw", "$v0, %lo(g_ctx)($v0)"], ["li", "$a0, 1"], ["lh", "$v0, 4($v0)"], ["beq", "$v0, $zero, .L08805354"], ["xori", "$v1, $v0, 6", 1], ["sltu", "$v0, $zero, $v1"], ["move", "$a0, $v0"], ["LABEL", ".L08805354:"], ["jr", "$ra"], ["move", "$v0, $a0", 1]]},
+
 {ch:5,kind:"concept",title:"What a call actually costs",
 body:`<p>Calling is one instruction: <code>jal</code>, "jump and link", which writes the address of the
 instruction after itself into <code>$ra</code> and jumps. Returning is <code>jr $ra</code>. That is the whole
@@ -1046,7 +1153,8 @@ worth trusting.</p>`},
 
 {ch:6,kind:"ex",title:"Copying between two arrays",loose:true,
 body:`<p>Two pointers now, each advancing by one element per pass. Read which one is loaded and which one
-is stored — that decides which parameter is the destination.</p>`,
+is stored — that decides which parameter is the destination.</p>
+<p>Indexing in C is written with brackets: <code>dst[i]</code> is the element <code>i</code> places along from <code>dst</code>.</p>`,
 asm:[["blez","$a2, .L_end"],["nop","",1],["LABEL",".L_loop:"],["lw","$v0, 0($a1)"],
      ["addiu","$a2, $a2, -1"],["addiu","$a1, $a1, 4"],["sw","$v0, 0($a0)"],
      ["bnez","$a2, .L_loop"],["addiu","$a0, $a0, 4",1],["LABEL",".L_end:"],["jr","$ra"],["nop","",1]],
@@ -1192,7 +1300,9 @@ body:`<p>Here the FPU breaks the pattern you learned on the integer side. <code>
 a register — it sets a hidden condition bit inside the FPU, and <code>bc1f</code> ("branch on FP condition
 false") reads it. The one place this machine does have a flag.</p>
 <p>Trace it: if <code>a &lt; b</code> is false, branch away with <code>b</code> already loaded into the
-return register by the delay slot. Otherwise fall through and overwrite it with <code>a</code>.</p>`,
+return register by the delay slot. Otherwise fall through and overwrite it with <code>a</code>.</p>
+<p>The C construct that picks between two values is the conditional operator, <code>cond ? x : y</code> — read as "if cond then x else y".</p>
+<p><code>mov.s</code> copies one float register into another — the float side's equivalent of <code>move</code>, with the <code>.s</code> suffix meaning single precision.</p>`,
 asm:[["c.lt.s","$f12, $f14"],["bc1f",".L_end"],["mov.s","$f0, $f14",1],["mov.s","$f0, $f12"],
      ["LABEL",".L_end:"],["jr","$ra"],["nop","",1]],
 sig:"float f(float a, float b)",hint:"Which of the two comes back when a < b?",
@@ -1218,7 +1328,8 @@ though the C is identical. That is the main flavour of what changes when you mov
 body:`<p><code>ext</code> extracts a run of bits: <code>ext $v0, $a0, 8, 4</code> means take 4 bits starting
 at position 8 of <code>$a0</code>, and right-align them in <code>$v0</code>.</p>
 <p>On the PS1 this took a shift and a mask. Here it is one instruction, so the packed-field idiom you
-learned in chapter 3 looks completely different — but the C that produces it is the same.</p>`,
+learned in chapter 3 looks completely different — but the C that produces it is the same.</p>
+<p>In C this is two operators: <code>&gt;&gt;</code> shifts the value down, and <code>&amp;</code> masks off what is left above the field.</p>`,
 asm:[["ext","$v0, $a0, 8, 4"],["jr","$ra"],["nop","",1]],
 sig:"int f(int x)",hint:"Shift down by the position, then mask to the width. 4 bits is 0xF.",
 answers:["return (x>>8)&0xf;","return (x>>8)&15;","return(x>>8)&0xF;"],
@@ -1273,7 +1384,8 @@ struct as a whole rounds up.</p>
 body:`<p>Start gently. Two loads at fixed offsets and an add, with the add moved into the return's delay
 slot because there was nothing else to put there.</p>
 <p>Read the offsets against the struct.</p>
-`+CARD_DEF,
+
+<p>Both reads go through the pointer with the arrow operator: <code>c-&gt;atk</code>.</p>`+CARD_DEF,
 sig:"int card_power(Card *c)",hint:"Offsets 4 and 8.",
 answers:["return c->atk+c->def;","return c->def+c->atk;","return (*c).atk+(*c).def;"],
 teach:`<p>Notice the compiler loaded into <code>$v1</code> first and <code>$v0</code> second, then added them
@@ -1305,7 +1417,8 @@ body:`<p>No load at the end, so nothing is being read from memory — the functi
 address itself.</p>
 <p>The three instructions before it build the multiplier: shift left 1 is ×2, adding the original makes ×3,
 shift left 2 makes ×12. That is the struct's size.</p>
-`+CARD_DEF,
+
+<p>Two operators in C here: <code>deck[i]</code> is the element, and <code>&amp;</code> in front of it takes that element's address rather than its value.</p>`+CARD_DEF,
 sig:"Card *card_at(Card *deck, int i)",hint:"Take the address of an array element.",
 answers:["return &deck[i];","return deck+i;","return &(deck[i]);"],
 teach:`<p>This is the payoff from the shift-and-add lesson. A stride of 12 tells you
@@ -1320,7 +1433,9 @@ all. The compiler multiplied the count by 12, added it to the base to get an <b>
 loop runs until the walking pointer reaches it.</p>
 <p>Also note <code>lbu</code> at offset 1 — the one-byte unsigned field — and the guard at the top that
 skips everything and returns zero when the count is not positive.</p>
-`+CARD_DEF,
+
+<p>In C you write the ordinary indexed form, <code>hand[i].cost</code> — brackets to pick the element, dot to pick the field inside it.</p>
+<p><code>bne</code> is "<b>b</b>ranch if <b>n</b>ot <b>e</b>qual": it compares two registers and jumps when they differ. Here it compares the walking pointer against the end pointer, so the loop continues until they meet.</p>`+CARD_DEF,
 sig:"int hand_total(Card *hand, int n)",
 hint:"Add up one field across n cards. Write it as an ordinary counted loop; the pointer trick is the compiler's doing.",
 answers:["int t=0;int i;for(i=0;i<n;i++)t+=hand[i].cost;return t;",
@@ -1337,7 +1452,8 @@ body:`<p>The last instruction is the interesting one. <code>xori $v0, $v0, 0x1</
 which turns 1 into 0 and 0 into 1 — it is inverting a true/false value.</p>
 <p>So: read a global, read the one-byte field, do a less-than the <em>wrong way round</em>, then invert it.
 Inverting "greater than" gives you "less than or equal".</p>
-`+CARD_DEF,
+
+<p>The field is read through the pointer with <code>c-&gt;cost</code>, and the comparison is <code>&lt;=</code>.</p>`+CARD_DEF,
 sig:"int is_playable(Card *c)",
 hint:"The global is called g_energy. The comparison is not strict.",
 answers:["return c->cost<=g_energy;","return g_energy>=c->cost;"],
@@ -1353,7 +1469,9 @@ two-byte field, it gets ANDed with the third argument, and when the result is ze
 skipped by branching over it.</p>
 <p>Look at where the pointer advance sits: in the delay slot of the branch that skips the increment, so it
 happens on both paths.</p>
-`+CARD_DEF,
+
+<p>In C: <code>hand[i].flags</code> reads the field, and <code>&amp;</code> masks it against the argument.</p>
+<p><code>beq</code> is "<b>b</b>ranch if <b>eq</b>ual": jump when the two registers hold the same value. Against <code>$zero</code> it means "jump if this is zero", which is how the skipped increment works.</p>`+CARD_DEF,
 sig:"int count_flag(Card *hand, int n, int mask)",
 hint:"Count how many cards have any of the mask bits set.",
 answers:["int c=0;int i;for(i=0;i<n;i++)if(hand[i].flags&mask)c++;return c;",
@@ -1470,7 +1588,8 @@ a completed function looks like tells you what you are aiming at.</p>`}
 
 /* ============ chapter 11 — the real thing ============ */
 {ch:11,kind:"concept",title:"Reading your own game",
-body:`<p>Everything from here is lifted from <b>Metal Gear Ac!d</b> itself — the savedata overlay,
+body:`<p>Real functions from this module are scattered through the earlier chapters, each placed where it demonstrates that chapter's idea. What follows here is the workflow around them, and one function read end to end.</p>
+<p>Everything in this chapter is lifted from <b>Metal Gear Ac!d</b> itself — the savedata overlay,
 <code>mgp_stage</code>, loaded at <code>0x08804000</code>. Thirty-three functions, five Sony imports, no
 symbols. These are not teaching examples; nobody arranged them to be readable.</p>
 <p>Three things about real extracted code that the made-up exercises could not show you.</p>
@@ -1532,54 +1651,6 @@ assembler error rather than a mismatch.</p>
 <p>Doing this by hand for every function gets old immediately, which is why there is a converter script
 alongside this trainer. Paste a listing in, get scratch-ready assembly out, with the unrelocated
 <code>lui</code> lines flagged for you to fill in.</p>`},
-
-{ch:11,kind:"ex",title:"FUN_08805334 — a redundant condition",plat:"Metal Gear Ac!d &middot; mgp_stage &middot; GCC 3.3.3+allegrex -O2 -G0",loose:true,
-body:`<p>The first function you looked at. Ten instructions, and the shape of the C is deducible from one
-oddity in it.</p>
-<p>The address build fetches a pointer from a global, then a signed halfword is read from offset 4 of
-whatever it points at. <code>xori</code> against 6 is an equality test — XOR is zero only when both sides
-match — and <code>sltu $v0, $zero, $v1</code> turns any nonzero value into exactly 1.</p>
-<p>Now the tell: if the field is zero the branch skips ahead with 1 already loaded. But zero is not six
-anyway, so that path computes nothing the other path would not have produced. <b>A compiler does not emit
-redundant work.</b> Something in the source forced it — and in C only one construct forces the left side of
-a test to be evaluated and branched on before the right side is touched.</p>
-`+CTX_A,
-sig:"int func_08805334(void)",
-hint:"Two conditions joined by the operator that short-circuits. The first one is redundant, and you should write it anyway.",
-answers:["short state=g_ctx->state;return state==0||state!=6;",
-         "return g_ctx->state==0||g_ctx->state!=6;",
-         "short s=g_ctx->state;return s==0||s!=6;",
-         "int state=g_ctx->state;return state==0||state!=6;"],
-teach:`<p>The redundancy is the evidence. <code>||</code> guarantees the left operand is evaluated first and
-the right skipped if it already decided the answer, so the compiler must emit a branch even when the logic
-makes it pointless. Someone wrote two conditions in 2004 without noticing one covered the other, and the
-machine code preserved their mistake.</p>
-<p>Also note <code>lh</code> rather than <code>lhu</code>: the field is a <b>signed</b> 16-bit value. If you
-declare it unsigned, the load instruction changes and the match breaks.</p>`,
-asm:[["lui", "$v0, %hi(g_ctx)"], ["lw", "$v0, %lo(g_ctx)($v0)"], ["li", "$a0, 1"], ["lh", "$v0, 4($v0)"], ["beq", "$v0, $zero, .L08805354"], ["xori", "$v1, $v0, 6", 1], ["sltu", "$v0, $zero, $v1"], ["move", "$a0, $v0"], ["LABEL", ".L08805354:"], ["jr", "$ra"], ["move", "$v0, $a0", 1]]},
-
-{ch:11,kind:"ex",title:"FUN_08806218 — copying fields before a call",plat:"Metal Gear Ac!d &middot; mgp_stage &middot; GCC 3.3.3+allegrex -O2 -G0",loose:true,
-body:`<p>A pointer comes in as the single argument. The function writes a constant into one field, copies
-two 16-bit values down from high offsets to low ones, then calls something with the address of a
-sub-object.</p>
-<p>Two details to read carefully. <code>move $v1, $a0</code> at the top saves the pointer, because
-<code>addiu $a0, $a0, 0x40</code> later destroys it to build an argument — so the stores through
-<code>$v1</code> and the loads through <code>$a0</code> are the same object. And the second
-<code>sh</code> sits in the call's delay slot, so it happens before control transfers.</p>
-<p><code>lhu</code> and <code>sh</code> at offsets 0x148, 0x14c, 0x54 and 0x56 mean unsigned 16-bit fields.
-The call takes <code>&amp;p-&gt;sub</code> and the constant 1.</p>
-`+CTX_B,
-sig:"int func_08806218(Ctx *p)",
-hint:"Four statements and a return. Write them in the order the stores happen.",
-answers:["p->mode=2;p->w0=p->src0;p->w1=p->src1;func_00081718(&p->sub,1);return 0;",
-         "p->mode=2;p->w0=p->src0;p->w1=p->src1;func_00081718(&(p->sub),1);return 0;"],
-teach:`<p>The register shuffle at the top is the whole reason this looks confusing: one pointer, two
-registers, because the argument register had to be repurposed. Track which register holds the object and
-the function becomes four plain assignments.</p>
-<p>Copying 0x14c into 0x54 and 0x148 into 0x56 also tells you something structural — a pair of values being
-staged from one part of the object into another right before a call. Cross-reference those offsets in other
-functions and you will usually find what the sub-object at 0x40 is.</p>`,
-asm:[["addiu", "$sp, $sp, -0x10"], ["sw", "$ra, 0x0($sp)"], ["move", "$v1, $a0"], ["li", "$v0, 2"], ["lhu", "$a1, 0x14c($a0)"], ["lhu", "$a2, 0x148($a0)"], ["sw", "$v0, 0x50($a0)"], ["addiu", "$a0, $a0, 0x40"], ["sh", "$a1, 0x54($v1)"], ["li", "$a1, 1"], ["jal", "func_00081718"], ["sh", "$a2, 0x56($v1)", 1], ["lw", "$ra, 0x0($sp)"], ["li", "$v0, 0"], ["jr", "$ra"], ["addiu", "$sp, $sp, 0x10", 1]]},
 
 {ch:11,kind:"concept",title:"FUN_0880570c — read this one with me",plat:"Metal Gear Ac!d &middot; mgp_stage &middot; GCC 3.3.3+allegrex -O2 -G0",
 body:`<p>Not an exercise. This is a real function of ordinary size, and the point is to show you what
@@ -1727,12 +1798,46 @@ for unsigned values, and the second is far cheaper. For signed values they diffe
 exactly why the compiler emits more instructions for a signed modulo.</p>`,
 
 "Keeping only some bits":
-`<p>Do not confuse <code>&amp;</code> with <code>&amp;&amp;</code>. The single one is bitwise: it works on
-every bit position independently. The double one is logical: it treats both sides as true/false and
-short-circuits, skipping the right side entirely if the left already decided the answer. Same for
-<code>|</code> versus <code>||</code>.</p>
-<p>Mixing them up compiles fine and produces wrong answers, which is why it is worth a moment's care every
-time you type one.</p>`,
+`<p><b>Every number is a row of bits.</b> A 32-bit <code>int</code> is 32 ones and zeros. The value 5 is
+<code>…00000101</code> — a 1 in the fours column, a 1 in the ones column, zeros everywhere else. That is not
+a special way of writing 5; it is what 5 <em>is</em> inside the machine.</p>
+
+<p><b><code>&amp;</code> compares two numbers column by column</b> and keeps a 1 only where <em>both</em>
+sides have a 1. Each column is decided on its own, independently of its neighbours:</p>
+<pre>   0110 1101     <span class="c">109</span>
+&amp;  0000 1111     <span class="c">15   (0x0F)</span>
+   ---------
+   0000 1101     <span class="c">13</span></pre>
+<p>The right-hand number is all zeros on the left, so those columns come out zero no matter what was there.
+It is all ones on the right, so those columns keep whatever the first number had. The result is the bottom
+four bits of 109, and the rest is erased.</p>
+
+<p>That is what a <b>mask</b> means: a number chosen so that its 1s sit exactly where you want to keep
+things, and its 0s where you want to throw things away. <code>&amp;</code> applies it.</p>
+
+<p><b>Why hex, and not 255.</b> Both are the same number — the compiler cannot tell them apart. The
+difference is what <em>you</em> can see. Each hex digit is exactly four bits, so a hex constant shows you
+its own bit pattern at a glance:</p>
+<pre>0xF    = 1111              <span class="c">keep the low 4 bits  </span>
+0xFF   = 1111 1111         <span class="c">keep the low 8 bits (one byte)</span>
+0xFF00 = 1111 1111 0000 0000  <span class="c">keep the second byte</span>
+0x10   = 0001 0000         <span class="c">just bit 4         </span></pre>
+<p>Written in decimal those are 15, 255, 65280 and 16, and none of them look like anything. <code>0xFF00</code>
+obviously keeps one byte and drops another; 65280 obviously does not. So: <b>hex for bit patterns and
+addresses, decimal for counts and quantities.</b> The assembly is written in hex for the same reason, which
+means a hex constant in your C lines up visually with the constant in the listing.</p>
+
+<p><b>Now the trap.</b> <code>&amp;</code> and <code>&amp;&amp;</code> are different operators that look
+almost identical:</p>
+<pre>x &amp; 4     <span class="c">bitwise: works on all 32 columns, gives a number   </span>
+x &amp;&amp; 4    <span class="c">logical: "is x true AND is 4 true", gives 1 or 0   </span></pre>
+<p>With <code>x = 2</code>: <code>x &amp; 4</code> is 0, because 2 and 4 have no columns in common.
+<code>x &amp;&amp; 4</code> is 1, because both are nonzero and therefore both count as true. Completely
+different answers, and both compile without a warning. Same story for <code>|</code> against
+<code>||</code>.</p>
+
+<p>Rule of thumb: use <code>&amp;</code> when you are working on the bits inside a number, and
+<code>&amp;&amp;</code> when you are combining two yes/no questions in an <code>if</code>.</p>`,
 
 "Turning a bit on":
 `<p>The compound assignment operators save repeating the variable:</p>
@@ -2237,6 +2342,7 @@ function render(){
   $("kicker").textContent = `Chapter ${l.ch+1} · ${CH[l.ch]}`;
   $("title").textContent = l.title;
   usedNow = {};
+  $("after").innerHTML = "";   /* never let the previous lesson's takeaway linger */
   $("body").innerHTML = l.body;
   glossify($("body"));
   hideGloss();
